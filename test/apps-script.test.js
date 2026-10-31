@@ -661,10 +661,19 @@ test('legacy file inspection matches direct-upload envelopes and rejects malform
   assert.throws(() => isolated.inspectFile_('cut.png', [...Buffer.from('89504e470d0a1a0a', 'hex')]), /valid PNG/i);
   assert.throws(() => isolated.inspectFile_('fake.tif', [0x49, 0x49, 0, 0]), /valid TIFF/i);
 
+  const exportedSvg = '<?xml version="1.0" encoding="UTF-8"?>\n'
+    + '<!-- Generator: a vector editor -->\n'
+    + '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0 0h24v24H0z"/></svg>';
+  assert.doesNotThrow(() => isolated.inspectFile_('exported.svg', [...Buffer.from(exportedSvg)]));
+
   const invalidSvg = [
     '<svg xmlns="http://www.w3.org/2000/svg" width="1" width="2"/>',
     '<svg xmlns="http://www.w3.org/2000/svg"><text>&custom;</text></svg>',
     '<svg xmlns="http://www.w3.org/2000/svg"><path d="M0 < 1"/></svg>',
+    '<?xml-stylesheet href="https://example.invalid/a.css"?><svg xmlns="http://www.w3.org/2000/svg"/>',
+    '<!DOCTYPE svg><svg xmlns="http://www.w3.org/2000/svg"/>',
+    '<svg xmlns="http://www.w3.org/2000/svg"><![CDATA[unparsed text]]></svg>',
+    '<!-- broken -- comment --><svg xmlns="http://www.w3.org/2000/svg"/>',
   ];
   invalidSvg.forEach(value => assert.throws(
     () => isolated.inspectFile_('bad.svg', [...Buffer.from(value)]),

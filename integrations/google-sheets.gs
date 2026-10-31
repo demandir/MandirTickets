@@ -849,6 +849,7 @@ function inspectSvgText_(text) {
   var inTag = false;
   var quote = '';
   var token = '';
+  var xmlDeclarationSeen = false;
 
   function processTag(value) {
     if (/^<[!?]/.test(value)) throw new Error('SVG declarations, comments, CDATA and processing instructions are not supported.');
@@ -901,6 +902,22 @@ function inspectSvgText_(text) {
     var character = text[index];
     if (!inTag) {
       if (character === '<') {
+        if (text.slice(index, index + 4) === '<!--') {
+          var commentEnd = text.indexOf('-->', index + 4);
+          if (commentEnd === -1 || text.slice(index + 4, commentEnd).indexOf('--') !== -1) throw new Error('SVG contains a malformed comment.');
+          index = commentEnd + 2;
+          continue;
+        }
+        if (text.slice(index, index + 5).toLowerCase() === '<?xml') {
+          var declarationEnd = text.indexOf('?>', index + 5);
+          var declaration = declarationEnd === -1 ? '' : text.slice(index, declarationEnd + 2);
+          if (rootSeen || xmlDeclarationSeen || !/^<\?xml\s+version\s*=\s*(["'])1\.0\1(?:\s+encoding\s*=\s*(["'])utf-8\2)?(?:\s+standalone\s*=\s*(["'])(?:yes|no)\3)?\s*\?>$/i.test(declaration)) {
+            throw new Error('SVG contains an unsupported XML declaration.');
+          }
+          xmlDeclarationSeen = true;
+          index = declarationEnd + 1;
+          continue;
+        }
         inTag = true;
         token = '<';
       } else if ((!rootSeen || rootClosed) && !/\s/.test(character)) {

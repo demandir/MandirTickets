@@ -32,7 +32,8 @@ test('filename allowlist rejects executables, paths, control characters and over
   assert.throws(() => validateFilename('animation.gif'));
 });
 test('static SVG validates with a content hash; MIME is not trusted', async t => {
-  const content = svg('<defs><linearGradient id="g"><stop offset="0" stop-color="red"/></linearGradient></defs><rect width="24" height="24" fill="url(#g)"/>');
+  const content = '<?xml version="1.0" encoding="UTF-8"?>\n<!-- Exported by a vector editor -->\n'
+    + svg('<defs><linearGradient id="g"><stop offset="0" stop-color="red"/></linearGradient></defs><rect width="24" height="24" fill="url(#g)"/>');
   const file = await fixture(t,'design.svg',content);
   file.mimetype = 'application/octet-stream';
   const result = await validateUpload(file);
@@ -49,6 +50,7 @@ for (const [label, content] of Object.entries({
   encodedURL:svg('<rect fill="&#117;rl(https://example.invalid/image)"/>'),
   xxe:'<!DOCTYPE svg [<!ENTITY x SYSTEM "file:///etc/passwd">]>'+svg('<text>&x;</text>'),
   stylesheet:'<?xml-stylesheet href="https://example.invalid/a.css"?>'+svg(''),
+  cdata:svg('<text><![CDATA[unparsed text]]></text>'),
   broken:svg('<rect>'),
   nonSVG:'<html xmlns="http://www.w3.org/2000/svg"/>',
   deep:svg('<g>'.repeat(101)+'</g>'.repeat(101)),
