@@ -14,7 +14,8 @@ export default function ArtworkViewer({ rowId, fileId, filename, mime, onClose }
   const backendUrl = artworkFileUrl(rowId);
   const driveEmbedUrl = fileId ? `https://drive.google.com/file/d/${fileId}/preview` : null;
   const driveOpenUrl = fileId ? `https://drive.google.com/file/d/${fileId}/view` : backendUrl;
-  const isImage = mime?.startsWith('image/');
+  const isSvg = mime?.toLowerCase() === 'image/svg+xml' || filename?.toLowerCase().endsWith('.svg');
+  const isImage = !isSvg && mime?.startsWith('image/');
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -35,10 +36,10 @@ export default function ArtworkViewer({ rowId, fileId, filename, mime, onClose }
         </div>
         <div className="av-body">
           {isImage && <img className="av-image" src={driveEmbedUrl || backendUrl} alt={filename || 'Artwork'} />}
-          {!isImage && driveEmbedUrl && (
+          {!isSvg && !isImage && driveEmbedUrl && (
             <iframe className="av-pdf" src={driveEmbedUrl} title={filename || 'Artwork'} allow="autoplay" />
           )}
-          {!isImage && !driveEmbedUrl && (
+          {!isImage && (isSvg || !driveEmbedUrl) && (
             <div className="av-fallback">
               <i className="ti ti-file-unknown" aria-hidden="true" />
               <div>Preview not available.</div>

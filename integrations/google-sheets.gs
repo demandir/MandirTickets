@@ -810,11 +810,10 @@ function inspectFile_(name, bytes) {
   if (lower.endsWith('.png') && !isPngEnvelope_(bytes, bytes)) throw new Error('A PNG attachment is incomplete or is not a valid PNG.');
   if (/\.jpe?g$/.test(lower) && !(byte_(bytes[0]) === 255 && byte_(bytes[1]) === 216 && byte_(bytes[2]) === 255 && byte_(bytes[bytes.length - 2]) === 255 && byte_(bytes[bytes.length - 1]) === 217)) throw new Error('A JPG attachment is not a valid JPG.');
   if (/\.tiff?$/.test(lower) && !isTiffHeader_(bytes)) throw new Error('A TIFF attachment is not a valid TIFF.');
-  if (lower.endsWith('.svg') || lower.endsWith('.dxf')) {
+  if (lower.endsWith('.dxf')) {
     var text = Utilities.newBlob(bytes).getDataAsString('UTF-8');
-    if (text.indexOf('\uFFFD') !== -1) throw new Error('SVG and ASCII DXF files must use valid UTF-8 text.');
-    if (lower.endsWith('.svg')) inspectSvgText_(text);
-    if (lower.endsWith('.dxf')) inspectDxfText_(text);
+    if (text.indexOf('\uFFFD') !== -1) throw new Error('ASCII DXF files must use valid UTF-8 text.');
+    inspectDxfText_(text);
   }
 }
 

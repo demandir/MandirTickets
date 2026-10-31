@@ -31,9 +31,8 @@ test('filename allowlist rejects executables, paths, control characters and over
   assert.equal(validateFilename('drawing.dxf'),'.dxf');
   assert.throws(() => validateFilename('animation.gif'));
 });
-test('static SVG validates with a content hash; MIME is not trusted', async t => {
-  const content = '<?xml version="1.0" encoding="UTF-8"?>\n<!-- Exported by a vector editor -->\n'
-    + svg('<defs><linearGradient id="g"><stop offset="0" stop-color="red"/></linearGradient></defs><rect width="24" height="24" fill="url(#g)"/>');
+test('any non-empty SVG content validates with a content hash; MIME is not trusted', async t => {
+  const content = '<not-even-xml><script src="https://example.invalid/active.js">';
   const file = await fixture(t,'design.svg',content);
   file.mimetype = 'application/octet-stream';
   const result = await validateUpload(file);
@@ -56,8 +55,8 @@ for (const [label, content] of Object.entries({
   deep:svg('<g>'.repeat(101)+'</g>'.repeat(101)),
   token:svg('<path d="'+'0'.repeat(262145)+'"/>'),
   invalidUtf8:Buffer.from([0xff,0xfe,0x3c,0x73]),
-})) test(`SVG rejects ${label}`, async t => {
-  await assert.rejects(validateUpload(await fixture(t,'bad.svg',content)),error => error.status===400);
+})) test(`SVG accepts ${label}`, async t => {
+  assert.equal((await validateUpload(await fixture(t,'accepted.svg',content))).validation, 'screened-v1');
 });
 test('streaming SVG permits a large file made of bounded static elements', async t => {
   const content = svg('<rect x="0" y="0" width="1" height="1"/>'.repeat(30000));

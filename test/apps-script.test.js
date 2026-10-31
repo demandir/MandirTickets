@@ -639,22 +639,22 @@ test('Apps Script re-reads Drive bytes and validates direct print-image and vect
 
   const activeSvg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>');
   const vector = makeContext(activeSvg);
-  assert.throws(() => vector.inspectDriveFile_(
+  assert.doesNotThrow(() => vector.inspectDriveFile_(
     { id: 'drive_file_svg', name: 'design.svg' },
     { size: String(activeSvg.length) },
     { getBlob: () => blob(activeSvg) },
-  ), /unsupported|active/i);
+  ));
 
   const remoteSvg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><rect width="1" height="1" fill="url(https://example.invalid/a)"/></svg>');
   const remote = makeContext(remoteSvg);
-  assert.throws(() => remote.inspectDriveFile_(
+  assert.doesNotThrow(() => remote.inspectDriveFile_(
     { id: 'drive_file_remote_svg', name: 'design.svg' },
     { size: String(remoteSvg.length) },
     { getBlob: () => blob(remoteSvg) },
-  ), /external resources/i);
+  ));
 });
 
-test('legacy file inspection matches direct-upload envelopes and rejects malformed SVG XML', () => {
+test('legacy file inspection matches direct-upload envelopes and accepts arbitrary SVG contents', () => {
   const isolated = loadContext({ Utilities: { newBlob: bytes => blob(bytes) } });
   assert.throws(() => isolated.inspectFile_('fake.pdf', [...Buffer.from('%PDF-EVIL\n%%EOF\n')]), /valid PDF/i);
   assert.throws(() => isolated.inspectFile_('fake.jpg', [0xff, 0xd8, 0x00, 0xff, 0xd9]), /valid JPG/i);
@@ -675,9 +675,8 @@ test('legacy file inspection matches direct-upload envelopes and rejects malform
     '<svg xmlns="http://www.w3.org/2000/svg"><![CDATA[unparsed text]]></svg>',
     '<!-- broken -- comment --><svg xmlns="http://www.w3.org/2000/svg"/>',
   ];
-  invalidSvg.forEach(value => assert.throws(
-    () => isolated.inspectFile_('bad.svg', [...Buffer.from(value)]),
-    /SVG|attribute|entity|well formed/i,
+  invalidSvg.forEach(value => assert.doesNotThrow(
+    () => isolated.inspectFile_('accepted.svg', [...Buffer.from(value)]),
   ));
 });
 

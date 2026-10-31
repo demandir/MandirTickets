@@ -39,11 +39,11 @@ The static Pages build could display the request form but could not save tickets
 - Dependency audit reports zero known production vulnerabilities.
 - The HTTP suite verifies health, login, upload, idempotency, download authorization, privacy, status revisions, export, cross-origin preflight, secure cross-site cookies, and upload-limit cleanup.
 - The persistence suite verifies concurrent numbering, restart behavior, legacy sequences, atomic updates, stale-write rejection, status history, Sheets retry behavior, and CSV formula escaping.
-- The upload suite verifies filename restrictions, static SVG parsing, ASCII DXF structure, PDF/image envelopes, hashing, and fail-closed malware scanning.
+- The upload suite verifies filename restrictions, unrestricted non-empty SVG acceptance, ASCII DXF structure, PDF/image envelopes, hashing, and fail-closed malware scanning.
 - The configured local data directory passes the integrity audit with no errors or orphaned files.
 
 ## Remaining operational requirements
 
-The Google Sheet and Drive folder must remain private and should be covered by the Google Workspace retention and backup policy. Staff should treat uploaded files as untrusted; Apps Script performs format and static-content checks but does not provide ClamAV malware scanning. The default daily circuit breaker and Apps Script quotas suit a small controlled workshop, not a high-volume public service.
+The Google Sheet and Drive folder must remain private and should be covered by the Google Workspace retention and backup policy. Staff should treat uploaded files as untrusted. Apps Script checks print-file envelopes and ASCII DXF structure, but deliberately accepts all non-empty `.svg` contents and does not provide ClamAV malware scanning. SVG files must remain downloads and must never be rendered inline in a browser. The default daily circuit breaker and Apps Script quotas suit a small controlled workshop, not a high-volume public service.
 
 The optional Node deployment still requires an HTTPS host, persistent storage, current ClamAV signatures, backups, disk monitoring, individual staff identities for broader use, an external session store, request-abuse controls at the edge, and multiple-instance-safe database storage.
