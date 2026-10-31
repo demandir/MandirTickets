@@ -79,7 +79,7 @@ test('customer forms offer Telegram linking before the live queue', () => {
     assert.ok(telegram > -1, 'Telegram choice should be rendered in the request form');
     assert.ok(telegram < submit, 'Telegram choice should appear before submission');
     assert.match(html, /type="checkbox"/);
-    assert.match(html, /before the live queue/i);
+    assert.match(html, /scan a QR code/i);
   }
 });
 
@@ -102,6 +102,20 @@ test('ticket receipt gives Telegram notifications a prominent dedicated callout'
   assert.match(html, new RegExp(`href="${telegramLink.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
 });
 
+test('the page header offers a dark mode switch', () => {
+  assert.match(renderToStaticMarkup(React.createElement(App)), /aria-label="Switch to dark mode"/);
+});
+
+test('a ticket auto-linked from this browser needs no Telegram step', () => {
+  const html = renderToStaticMarkup(React.createElement(TicketReceipt, {
+    ticket: { ticketNumber: 'P-0044', machine: 'printer', department: 'Events', telegramLinked: true },
+    onStartAnother() {},
+    telegramRequested: true,
+  }));
+  assert.match(html, /Telegram is connected/);
+  assert.doesNotMatch(html, /telegram-button|telegram-qr/);
+});
+
 test('a Telegram form selection becomes the first-class receipt handoff', () => {
   const html = renderToStaticMarkup(React.createElement(TicketReceipt, {
     ticket: {
@@ -115,5 +129,6 @@ test('a Telegram form selection becomes the first-class receipt handoff', () => 
   }));
   assert.match(html, /telegram-opt-in-requested/);
   assert.match(html, /Finish linking Telegram/);
+  assert.match(html, /class="telegram-qr"/);
   assert.match(html, /Continue to Telegram/);
 });

@@ -124,10 +124,15 @@ test('Telegram commands and requester push copy stay scoped to ticket updates', 
   assert.equal(context.parseTelegramCommand_('what is my status?'), null);
   assert.equal(context.telegramStatusLabel_('pending-review'), 'Awaiting review');
   assert.equal(context.telegramStatusLabel_('in-progress'), 'In progress');
-  assert.equal(context.telegramPushMessage_('P-0042', 'ready'), 'P-0042 is ready for pickup.');
-  assert.equal(context.telegramPushMessage_('F-0011', 'declined', 'Please upload a sharper PDF.'), 'F-0011 was declined.\nReason: Please upload a sharper PDF.');
-  assert.equal(context.telegramPushMessage_('P-0042', 'queued'), '');
-  assert.doesNotMatch(context.telegramPushMessage_('P-0042', 'ready'), /phone|contact|https?:|@/i);
+  const poster = {
+    ticketNumber: 'P-0042', machine: 'printer', quantity: 3, width: 24, length: 36, purpose: 'Diwali stage backdrop', phone: '+13025550123',
+    files: [{ originalName: 'backdrop.pdf', url: 'https://drive.google.com/file/d/abc123456789/view' }],
+  };
+  const ready = context.telegramPushMessage_(poster, 'ready');
+  assert.match(ready, /^P-0042 is ready for pickup\.\n📋 Poster printing · Qty 3 · 24 × 36 in\nFor: Diwali stage backdrop\n📎 File: backdrop\.pdf\n/);
+  assert.match(context.telegramPushMessage_({ ...poster, ticketNumber: 'F-0011', machine: 'foam', thickness: 2 }, 'declined', 'Please upload a sharper PDF.'), /^F-0011 was declined\.\n📋 Foam cutting · Qty 3 · 24 × 36 in · 2 in thick\n[\s\S]*Reason: Please upload a sharper PDF\.$/);
+  assert.equal(context.telegramPushMessage_(poster, 'queued'), '');
+  assert.doesNotMatch(ready, /phone|contact|https?:|@|\+1302/i);
 });
 
 test('Telegram staff group receives the complete formatted submission without requester opt-in', () => {
@@ -172,18 +177,28 @@ test('Telegram staff group receives the complete formatted submission without re
   assert.equal(records.length, 1);
   assert.equal(records[0].audience, 'staff');
   assert.equal(records[0].status, 'new');
-  assert.match(records[0].message, /🆕 NEW WORKSHOP TICKET/);
-  assert.match(records[0].message, /P-0042 · Awaiting review/);
+  assert.match(records[0].message, /^🆕 P-0042 · Poster printing · Private Requester\nNEW WORKSHOP TICKET · Awaiting review/);
   assert.match(records[0].message, /Name: Private Requester/);
   assert.match(records[0].message, /Department: Events/);
-  assert.match(records[0].message, /Phone: \+13025550123/);
+  assert.doesNotMatch(records[0].message, /Phone|\+13025550123/);
   assert.match(records[0].message, /Purpose:\nPrivate event/);
   assert.match(records[0].message, /Quantity: 3/);
   assert.match(records[0].message, /Finished size: 24 × 36 in/);
-  assert.match(records[0].message, /Needed by: Tomorrow/);
+  assert.match(records[0].message, /🔴 Needed by: Tomorrow/);
   assert.match(records[0].message, /ADDITIONAL NOTES\nUse the approved blue and gold artwork/);
   assert.match(records[0].message, /1\. main poster\.pdf\n   https:\/\/drive\.google\.com\/file\/d\/abc123456789\/view/);
   assert.match(records[0].message, /2\. alternate poster\.pdf\n   https:\/\/drive\.google\.com\/file\/d\/xyz987654321\/view/);
+});
+
+test('Telegram needed-by line hides no-rush tickets and flags close deadlines', () => {
+  const now = new Date('2026-11-02T15:00:00.000Z');
+  assert.equal(context.telegramNeededBy_('No rush', now), '');
+  assert.equal(context.telegramNeededBy_('', now), '');
+  assert.equal(context.telegramNeededBy_('This week', now), 'Needed by: This week');
+  assert.equal(context.telegramNeededBy_('2026-11-03', now), '🔴 Needed by: Tue, 03 Nov 2026');
+  assert.equal(context.telegramNeededBy_('2026-11-20', now), 'Needed by: Fri, 20 Nov 2026');
+  const message = context.telegramStaffNewTicketMessage_({ ticketNumber: 'P-0050', machine: 'printer', neededBy: 'No rush', notes: '', files: [] });
+  assert.doesNotMatch(message, /Needed by|ADDITIONAL NOTES|Phone/);
 });
 
 test('long Telegram staff submissions are split without dropping submitted details', () => {
@@ -214,6 +229,54 @@ test('long Telegram staff submissions are split without dropping submitted detai
   assert.match(messages[1], /F-0099 continued · Part 2/);
 });
 
+test('a browser that already linked Telegram reuses its chat for the next ticket', () => {
+  const key = 'a'.repeat(32);
+  const linked = Array(11).fill('');
+  linked[0] = 'old-ticket';
+  linked[2] = '7654321';
+  linked[3] = '111';
+  linked[4] = 'enabled';
+  linked[10] = `hash-${key}`;
+  const writes = [];
+  const sheet = rows => ({ rows, getLastRow: () => rows.length + 1, getRange: rowNumber => ({ setValues: values => writes.push({ rowNumber, row: values[0] }) }) });
+  const run = rows => {
+    const isolated = loadContext();
+    const records = [];
+    isolated.LockService = { getScriptLock: () => ({ waitLock() {}, hasLock: () => false, releaseLock() {} }) };
+    isolated.SpreadsheetApp = { flush() {} };
+    isolated.ensureTelegramSheets_ = () => ({ subscriptions: sheet(rows), outbox: {} });
+    isolated.telegramSheetRows_ = target => target.rows;
+    isolated.sha256Hex_ = value => `hash-${value}`;
+    isolated.appendTelegramOutbox_ = (_outbox, record) => { records.push(record); return true; };
+    return { isolated, records };
+  };
+  const ticket = { id: 'new-ticket', ticketNumber: 'P-0044', machine: 'printer', quantity: 1, purpose: 'Sabha banner', files: [] };
+
+  const match = run([linked]);
+  assert.equal(match.isolated.telegramAttachDevice_({}, ticket, key), true);
+  const written = writes.pop();
+  assert.equal(written.rowNumber, 3);
+  assert.equal(written.row[2], '7654321');
+  assert.equal(written.row[4], 'enabled');
+  assert.equal(written.row[10], `hash-${key}`);
+  assert.equal(match.records[0].chatId, '7654321');
+  assert.match(match.records[0].message, /^🔗 P-0044 was added[\s\S]*\/stop/);
+
+  const stopped = [...linked];
+  stopped[4] = 'disabled';
+  stopped[2] = '';
+  const afterStop = run([stopped]);
+  assert.equal(afterStop.isolated.telegramAttachDevice_({}, ticket, key), false);
+  assert.equal(writes.pop().row[4], '');
+  assert.equal(afterStop.records.length, 0);
+
+  const other = run([linked]);
+  assert.equal(other.isolated.telegramAttachDevice_({}, ticket, 'b'.repeat(32)), false);
+  assert.equal(other.records.length, 0);
+  assert.equal(other.isolated.telegramAttachDevice_({}, ticket, 'not-a-key'), false);
+  assert.equal(other.isolated.telegramAttachDevice_({}, ticket, undefined), false);
+});
+
 test('Telegram decline notifications include the saved reason for requester and staff', () => {
   const declineReason = 'Please upload a higher-resolution PDF.';
   const ticket = {
@@ -224,7 +287,11 @@ test('Telegram decline notifications include the saved reason for requester and 
     createdAt: '2026-10-30T08:00:00.000Z',
     files: [],
     reason: declineReason,
-    history: [{ status: 'declined', at: '2026-10-30T12:30:00.000Z', reason: declineReason }],
+    customerName: 'Asha Patel',
+    department: 'Events',
+    quantity: 1,
+    purpose: 'Sabha banner',
+    history: [{ status: 'declined', at: '2026-10-30T12:30:00.000Z', reason: declineReason, operator: 'Karan' }],
   };
   const subscription = Array(10).fill('');
   subscription[0] = ticket.id;
@@ -249,7 +316,10 @@ test('Telegram decline notifications include the saved reason for requester and 
 
   assert.equal(isolated.reconcileTelegramEvents_({}, { rows: [subscription] }, { rows: [] }, properties), 2);
   assert.deepEqual(records.map(record => record.audience).sort(), ['requester', 'staff']);
-  records.forEach(record => assert.equal(record.message, `P-0043 was declined.\nReason: ${declineReason}`));
+  const requester = records.find(record => record.audience === 'requester');
+  const staff = records.find(record => record.audience === 'staff');
+  assert.equal(requester.message, `P-0043 was declined.\n📋 Poster printing · Qty 1\nFor: Sabha banner\nReason: ${declineReason}`);
+  assert.equal(staff.message, `❌ DECLINED · P-0043\nDeclined by: Karan\n👤 Asha Patel · Events\n📋 Poster printing · Qty 1\nFor: Sabha banner\nReason: ${declineReason}\n\n📱 Requester notified on Telegram`);
 });
 
 test('Telegram delivery outcomes retry only definite transient failures', () => {

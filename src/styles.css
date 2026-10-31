@@ -8,9 +8,10 @@
 
 :root {
   font-family: "Geist", system-ui, sans-serif;
-  color: #17251c;
-  background: #f3efe5;
+  color: var(--ink);
+  background: var(--cream);
   font-synthesis: none;
+  color-scheme: light;
   --ink: #17251c;
   --forest: #1d3a29;
   --forest-dark: #12271b;
@@ -25,6 +26,96 @@
   --radius-lg: 30px;
   --radius-md: 18px;
   --shadow: 0 24px 70px rgba(23, 37, 28, 0.12);
+  --surface: #fff;
+  --line-strong: rgba(23, 37, 28, 0.36);
+  --on-saffron: #12271b;
+  --on-accent: #fff;
+  --accent-hover: #294b36;
+  --eyebrow: #8b5b08;
+  --card-soft: rgba(255, 253, 248, 0.9);
+  --placeholder: #9aa19b;
+  --field: #f9f7f0;
+  --field-hover: #f2f2e8;
+  --file-row: #f2eee6;
+  --danger-soft: #f7deda;
+  --danger-ink: #74221d;
+  --tg-soft: #f2fbff;
+  --tg-soft-2: #e4f6ff;
+  --tg-body: #31505f;
+  --tg-title: #123f55;
+  --tg-state: #147dad;
+  --tg-link: #0d75aa;
+}
+
+/* Scoped to screens so printed receipts stay dark text on white. */
+@media screen and (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ink: #ecefe6;
+    --forest: #b9d6c2;
+    --forest-dark: #dff0e3;
+    --cream: #0f1511;
+    --paper: #18211b;
+    --surface: #1f2a23;
+    --saffron-soft: #4d3b14;
+    --sage: #2b3b31;
+    --line: rgba(236, 239, 230, 0.16);
+    --line-strong: rgba(236, 239, 230, 0.36);
+    --muted: #a7b2a9;
+    --danger: #f2978c;
+    --danger-soft: #472320;
+    --danger-ink: #f9c9c3;
+    --shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+    --on-accent: #0f1511;
+    --accent-hover: #c4dcca;
+    --eyebrow: #eab54d;
+    --card-soft: rgba(24, 33, 27, 0.9);
+    --placeholder: #7f8b82;
+    --field: #1c2620;
+    --field-hover: #233027;
+    --file-row: #222d26;
+    --tg-soft: #10262f;
+    --tg-soft-2: #143340;
+    --tg-body: #b4cbd6;
+    --tg-title: #e3f3fb;
+    --tg-state: #6cc4ee;
+    --tg-link: #6cc4ee;
+  }
+}
+
+@media screen {
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --ink: #ecefe6;
+    --forest: #b9d6c2;
+    --forest-dark: #dff0e3;
+    --cream: #0f1511;
+    --paper: #18211b;
+    --surface: #1f2a23;
+    --saffron-soft: #4d3b14;
+    --sage: #2b3b31;
+    --line: rgba(236, 239, 230, 0.16);
+    --line-strong: rgba(236, 239, 230, 0.36);
+    --muted: #a7b2a9;
+    --danger: #f2978c;
+    --danger-soft: #472320;
+    --danger-ink: #f9c9c3;
+    --shadow: 0 24px 70px rgba(0, 0, 0, 0.45);
+    --on-accent: #0f1511;
+    --accent-hover: #c4dcca;
+    --eyebrow: #eab54d;
+    --card-soft: rgba(24, 33, 27, 0.9);
+    --placeholder: #7f8b82;
+    --field: #1c2620;
+    --field-hover: #233027;
+    --file-row: #222d26;
+    --tg-soft: #10262f;
+    --tg-soft-2: #143340;
+    --tg-body: #b4cbd6;
+    --tg-title: #e3f3fb;
+    --tg-state: #6cc4ee;
+    --tg-link: #6cc4ee;
+  }
 }
 
 * {
@@ -111,7 +202,7 @@ p {
   padding: 12px 17px;
   border-radius: 10px;
   background: var(--saffron);
-  color: var(--ink);
+  color: var(--on-saffron);
   font-weight: 800;
 }
 
@@ -154,7 +245,7 @@ p {
   place-items: center;
   border-radius: 13px;
   background: var(--saffron);
-  color: var(--forest-dark);
+  color: var(--on-saffron);
   font-family: Georgia, serif;
   font-size: 24px;
   font-weight: 700;
@@ -232,7 +323,7 @@ main {
 
 .eyebrow {
   margin-bottom: 18px;
-  color: #8b5b08;
+  color: var(--eyebrow);
   font-size: 12px;
   font-weight: 820;
   letter-spacing: 0.13em;
@@ -273,7 +364,7 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 22px;
   overflow: hidden;
-  background: rgba(255, 253, 248, 0.9);
+  background: var(--card-soft);
   color: var(--ink);
   text-align: left;
   box-shadow: 0 12px 35px rgba(23, 37, 28, 0.05);
@@ -293,7 +384,7 @@ h1 {
 }
 
 .machine-choice:hover {
-  border-color: rgba(23, 37, 28, 0.4);
+  border-color: var(--line-strong);
   box-shadow: var(--shadow);
   transform: translateY(-3px);
 }
@@ -492,9 +583,9 @@ input,
 select,
 textarea {
   width: 100%;
-  border: 1px solid rgba(23, 37, 28, 0.2);
+  border: 1px solid var(--line);
   border-radius: 13px;
-  background: white;
+  background: var(--surface);
   color: var(--ink);
   font-size: 16px;
   font-weight: 500;
@@ -516,7 +607,7 @@ textarea {
 
 input::placeholder,
 textarea::placeholder {
-  color: #9aa19b;
+  color: var(--placeholder);
 }
 
 input:focus,
@@ -550,9 +641,9 @@ textarea:focus {
   justify-content: center;
   gap: 7px;
   padding: 26px;
-  border: 1.5px dashed rgba(23, 37, 28, 0.34);
+  border: 1.5px dashed var(--line-strong);
   border-radius: 16px;
-  background: #f9f7f0;
+  background: var(--field);
   color: var(--forest);
   text-align: center;
   transition: border-color 140ms ease, background 140ms ease;
@@ -561,7 +652,7 @@ textarea:focus {
 .dropzone:hover,
 .dropzone:focus-within {
   border-color: var(--forest);
-  background: #f2f2e8;
+  background: var(--field-hover);
 }
 
 .dropzone strong {
@@ -602,7 +693,7 @@ textarea:focus {
   padding: 11px 12px;
   border: 1px solid var(--line);
   border-radius: 11px;
-  background: white;
+  background: var(--surface);
 }
 
 .file-list li > svg {
@@ -641,7 +732,7 @@ textarea:focus {
 }
 
 .file-list button:hover {
-  background: #f2eee6;
+  background: var(--file-row);
   color: var(--danger);
 }
 
@@ -674,7 +765,7 @@ textarea:focus {
   padding: 17px;
   border: 1.5px solid rgba(22, 141, 196, 0.45);
   border-radius: 16px;
-  background: #f2fbff;
+  background: var(--tg-soft);
   cursor: pointer;
   transition: border-color 140ms ease, background 140ms ease, box-shadow 140ms ease;
 }
@@ -683,7 +774,7 @@ textarea:focus {
 .telegram-form-choice:focus-within,
 .telegram-form-choice.selected {
   border-color: #168dc4;
-  background: #e4f6ff;
+  background: var(--tg-soft-2);
   box-shadow: 0 0 0 3px rgba(22, 141, 196, 0.1);
 }
 
@@ -711,7 +802,7 @@ textarea:focus {
   min-width: 0;
   display: grid;
   gap: 3px;
-  color: #31505f;
+  color: var(--tg-body);
   font-size: 12px;
   font-weight: 560;
   letter-spacing: normal;
@@ -720,12 +811,12 @@ textarea:focus {
 }
 
 .telegram-form-copy strong {
-  color: #123f55;
+  color: var(--tg-title);
   font-size: 15px;
 }
 
 .telegram-form-choice > .telegram-form-state {
-  color: #147dad;
+  color: var(--tg-state);
   font-size: 10px;
   font-weight: 820;
   letter-spacing: 0.08em;
@@ -775,17 +866,17 @@ textarea:focus {
 
 .button-primary {
   background: var(--forest-dark);
-  color: white;
+  color: var(--on-accent);
   box-shadow: 0 12px 28px rgba(18, 39, 27, 0.19);
 }
 
 .button-primary:hover:not(:disabled) {
-  background: #294b36;
+  background: var(--accent-hover);
 }
 
 .button-secondary {
   border-color: var(--line);
-  background: white;
+  background: var(--surface);
   color: var(--ink);
 }
 
@@ -813,8 +904,8 @@ progress {
 }
 
 .notice.error {
-  background: #f7deda;
-  color: #74221d;
+  background: var(--danger-soft);
+  color: var(--danger-ink);
 }
 
 .receipt-card {
@@ -869,7 +960,7 @@ progress {
   padding: 20px;
   border: 2px solid #168dc4;
   border-radius: 18px;
-  background: linear-gradient(135deg, #f2fbff, #e4f6ff);
+  background: linear-gradient(135deg, var(--tg-soft), var(--tg-soft-2));
   box-shadow: 0 14px 34px rgba(34, 158, 217, 0.16);
 }
 
@@ -891,13 +982,13 @@ progress {
   min-width: 0;
   display: grid;
   gap: 4px;
-  color: #31505f;
+  color: var(--tg-body);
   font-size: 13px;
   line-height: 1.45;
 }
 
 .telegram-opt-in-copy strong {
-  color: #123f55;
+  color: var(--tg-title);
   font-size: 16px;
 }
 
@@ -911,6 +1002,58 @@ progress {
 
 .telegram-button:hover {
   background: #0d75aa;
+}
+
+.theme-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  cursor: pointer;
+}
+
+.telegram-opt-in-linked {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.telegram-form-remembered {
+  margin: 10px 0 0;
+  color: var(--tg-body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.telegram-form-remembered button {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--tg-link);
+  font: inherit;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.telegram-qr {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 0;
+  padding-top: 14px;
+  border-top: 1px solid rgba(22, 141, 196, 0.25);
+  color: var(--tg-body);
+  font-size: 13px;
+  line-height: 1.45;
+}
+
+.telegram-qr svg {
+  flex: none;
+  width: 112px;
+  height: 112px;
+  border-radius: 8px;
 }
 
 .receipt-actions {
@@ -1022,6 +1165,10 @@ footer strong {
     grid-column: 1 / -1;
   }
 
+  .telegram-qr {
+    display: none;
+  }
+
   .deployment-banner {
     right: 12px;
     bottom: 12px;
@@ -1099,8 +1246,13 @@ footer strong {
   .deployment-banner,
   .machine-step,
   .receipt-actions,
+  .telegram-button,
   footer {
     display: none;
+  }
+
+  .telegram-qr {
+    display: flex;
   }
 
   main {
@@ -1207,7 +1359,7 @@ footer strong {
   padding: 0 16px;
   border: 1px solid var(--line);
   border-radius: 11px;
-  background: white;
+  background: var(--surface);
   color: var(--forest);
   font: inherit;
   font-size: 14px;
@@ -1217,7 +1369,7 @@ footer strong {
 .queue-tabs button[aria-selected="true"] {
   border-color: var(--forest);
   background: var(--forest);
-  color: white;
+  color: var(--on-accent);
 }
 
 .queue-tabs span {
@@ -1425,7 +1577,7 @@ footer strong {
     padding: 15px;
     border: 1px solid var(--line);
     border-radius: 12px;
-    background: white;
+    background: var(--surface);
   }
 
   .queue-position small,
