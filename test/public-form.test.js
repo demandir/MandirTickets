@@ -71,15 +71,16 @@ test('every customer ticket requires at least one artwork file', () => {
   }
 });
 
-test('customer forms offer Telegram linking before the live queue', () => {
+test('customer forms require Telegram linking before the live queue', () => {
   for (const machine of ['printer', 'foam']) {
     const html = renderTicketForm(machine);
-    const telegram = html.indexOf('Link Telegram to this ticket');
-    const submit = html.indexOf('Submit ticket');
-    assert.ok(telegram > -1, 'Telegram choice should be rendered in the request form');
-    assert.ok(telegram < submit, 'Telegram choice should appear before submission');
-    assert.match(html, /type="checkbox"/);
-    assert.match(html, /scan a QR code/i);
+    const telegram = html.indexOf('Telegram is required for every ticket');
+    const submit = html.indexOf('Submit and link Telegram');
+    assert.ok(telegram > -1, 'Telegram requirement should be rendered in the request form');
+    assert.ok(telegram < submit, 'Telegram requirement should appear before submission');
+    assert.match(html, /Telegram <span>Required<\/span>/);
+    assert.doesNotMatch(html, /type="checkbox"/);
+    assert.match(html, /confirm pickup/i);
   }
 });
 
@@ -90,15 +91,16 @@ test('public site uses the live queue without a private tracking form', () => {
   assert.match(html, /Live workshop queue/i);
 });
 
-test('ticket receipt gives Telegram notifications a prominent dedicated callout', () => {
+test('ticket receipt requires the Telegram handoff before another submission', () => {
   const telegramLink = 'https://t.me/DelMandirDesignbot?start=00112233445566778899aabbccddeeff';
   const html = renderToStaticMarkup(React.createElement(TicketReceipt, {
     ticket: { ticketNumber: 'P-0042', machine: 'printer', department: 'Events', telegramLink },
     onStartAnother() {},
   }));
-  assert.match(html, /class="telegram-opt-in"/);
-  assert.match(html, /Get notified when your ticket is ready/);
+  assert.match(html, /class="telegram-opt-in telegram-opt-in-requested"/);
+  assert.match(html, /Required: finish linking Telegram/);
   assert.match(html, /class="button telegram-button"/);
+  assert.match(html, /<button[^>]*disabled=""[^>]*>Open another ticket/);
   assert.match(html, new RegExp(`href="${telegramLink.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
 });
 
@@ -110,10 +112,10 @@ test('a ticket auto-linked from this browser needs no Telegram step', () => {
   const html = renderToStaticMarkup(React.createElement(TicketReceipt, {
     ticket: { ticketNumber: 'P-0044', machine: 'printer', department: 'Events', telegramLinked: true },
     onStartAnother() {},
-    telegramRequested: true,
   }));
   assert.match(html, /Telegram is connected/);
   assert.doesNotMatch(html, /telegram-button|telegram-qr/);
+  assert.doesNotMatch(html, /<button[^>]*disabled=""[^>]*>Open another ticket/);
 });
 
 test('a Telegram form selection becomes the first-class receipt handoff', () => {
@@ -124,11 +126,10 @@ test('a Telegram form selection becomes the first-class receipt handoff', () => 
       department: 'Decorations',
       telegramLink: 'https://t.me/DelMandirDesignbot?start=ffeeddccbbaa99887766554433221100',
     },
-    telegramRequested: true,
     onStartAnother() {},
   }));
   assert.match(html, /telegram-opt-in-requested/);
-  assert.match(html, /Finish linking Telegram/);
+  assert.match(html, /Required: finish linking Telegram/);
   assert.match(html, /class="telegram-qr"/);
   assert.match(html, /Continue to Telegram/);
 });

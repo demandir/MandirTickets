@@ -47,7 +47,7 @@ const sheets = createSheetsSync(store, { url: process.env.SHEETS_WEBHOOK_URL, se
 const googleWorkshop = process.env.WORKSHOP_GOOGLE_SCRIPT_URL ? createGoogleWorkshop({ url: process.env.WORKSHOP_GOOGLE_SCRIPT_URL, secret: process.env.WORKSHOP_SHARED_SECRET }) : null;
 if (googleWorkshop && process.env.SHEETS_WEBHOOK_URL) throw new Error('Use Google as the source of truth OR a local mirror, never both.');
 const notifications = await createNotifications({directory:dataDir,apiKey:process.env.TEXTBEE_API_KEY,deviceId:process.env.TEXTBEE_DEVICE_ID});
-const workshop = googleWorkshop || { review: (...args) => store.review(...args), list: async () => store.list(), queue: async () => ({ machines: publicQueue(store.list()), updatedAt: new Date().toISOString() }), update: (id, status, revision, reason) => store.update(id, status, revision, true, reason), recordUsage: (...args) => store.recordUsage(...args) };
+const workshop = googleWorkshop || { review: (...args) => store.review(...args), list: async () => store.list(), queue: async () => ({ machines: publicQueue(store.list()), updatedAt: new Date().toISOString() }), update: (id, status, revision, reason, operator) => store.update(id, status, revision, true, reason, operator), recordUsage: (...args) => store.recordUsage(...args) };
 const app = express();
 app.disable('x-powered-by');
 app.use((req, res, next) => {
@@ -237,8 +237,8 @@ app.post('/api/tickets/:id/notifications/:notificationId/retry', requireStaff, a
 });
 app.patch('/api/tickets/:id', requireStaff, async (req, res) => {
   if (!req.body || !Number.isSafeInteger(req.body.expectedRevision) || req.body.expectedRevision < 1) fail('Refresh the ticket before changing its status.');
-  if (!['in-progress','ready','collected','cancelled'].includes(req.body.status)) fail('Use an approved production workflow step.',409);
-  const ticket = await workshop.update(req.params.id, req.body.status, req.body.expectedRevision, req.body.reason);
+  if (!['in-progress','ready','collected','cancelled','archived'].includes(req.body.status)) fail('Use an approved production workflow step.',409);
+  const ticket = await workshop.update(req.params.id, req.body.status, req.body.expectedRevision, req.body.reason, req.body.operator);
   void notifications.reconcile(await workshop.list()).catch(e=>console.error('Notification processing failed:',e.message));
   void sheets.sync();
   res.json({ ticket });

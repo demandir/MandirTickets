@@ -31,7 +31,10 @@ test('review gates production; approved jobs can start out of order; material hi
   await store.update(a.id,'ready',4,true);
   assert.equal(publicQueue(store.list())[1].tickets.find(t=>t.ticketNumber===b.ticketNumber).position,1);
   await store.update(a.id,'collected',5,true);
-  await assert.rejects(store.update(a.id,'queued',6,true),/workflow/);
+  const archived=await store.update(a.id,'archived',6,true,'','Archive volunteer');
+  assert.equal(archived.status,'archived');
+  assert.equal(archived.history.at(-1).operator,'Archive volunteer');
+  await assert.rejects(store.update(a.id,'queued',7,true),/workflow/);
   assert.equal((await createStore(dir)).list()[0].usage[0].used,6);
   assert.match(usageCsv(store.list()),/Foam 2 in/);
 });
@@ -87,6 +90,10 @@ test('Google staff operations authenticate, allow flexible order, save usage onc
   assert.equal(getRows()[1][19],'SECRET12'); assert.equal(getRows()[1][20],'private-key');
   assert.equal(call('staffUpdate',{id:'a',status:'collected',expectedRevision:3}).status,409);
   assert.equal(call('staffUpdate',{id:'a',status:'collected',expectedRevision:4}).ok,true);
+  const archived=call('staffUpdate',{id:'a',status:'archived',operator:'Archive volunteer',expectedRevision:5});
+  assert.equal(archived.ticket.status,'archived');
+  assert.equal(archived.ticket.history.at(-1).operator,'Archive volunteer');
+  assert.equal(getRows()[1][13],'archived');
   assert.equal(ctx.publicWorkshopQueue_().machines[1].tickets[0].ticketNumber,'F-0002');
 });
 test('Google public queue and private tracker agree after Sheet sorting and expose no personal data',()=>{

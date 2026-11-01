@@ -14,7 +14,7 @@ import {
   X,
 } from '@phosphor-icons/react';
 import QueueBoard from './QueueBoard.jsx';
-import { createSheetsTicket, validateFileSelection, validateSheetsFiles } from './sheets-api.js';
+import { createSheetsTicket, trackSheetsTicket, validateFileSelection, validateSheetsFiles } from './sheets-api.js';
 
 const MACHINES = {
   printer: 'Poster printing',
@@ -127,10 +127,11 @@ function telegramDeviceKey() {
   return key;
 }
 
-export function TicketReceipt({ ticket, onStartAnother, telegramRequested = false }) {
+export function TicketReceipt({ ticket, onStartAnother }) {
   const telegramLink = typeof ticket.telegramLink === 'string' && TELEGRAM_LINK_PATTERN.test(ticket.telegramLink)
     ? ticket.telegramLink
     : '';
+  const telegramLinked = ticket.telegramLinked === true;
   return (
     <section className="receipt-card" id="ticket-receipt" tabIndex="-1" aria-labelledby="receipt-title">
       <span className="receipt-check"><Check size={25} weight="bold" aria-hidden="true" /></span>
@@ -139,21 +140,22 @@ export function TicketReceipt({ ticket, onStartAnother, telegramRequested = fals
       <p className="receipt-label">Ticket number</p>
       <strong className="receipt-number">{ticket.ticketNumber}</strong>
       <p>{machineName(ticket)} · {ticket.department}{ticket.position ? ` · ${ticket.position - 1} ${ticket.position === 2 ? 'job' : 'jobs'} ahead of you` : ''}</p>
-      <p className="receipt-help">A karyakar will check your files and request details before your request joins the staff queue. Save the ticket number. Follow the live queue, or opt in to Telegram for ready and declined updates and on-demand status checks.</p>
-      {ticket.telegramLinked === true && <aside className="telegram-opt-in telegram-opt-in-linked" aria-label="Telegram ticket notifications">
+      <p className="receipt-help">A karyakar will check your files and request details before your request joins the staff queue. Telegram is required for ticket updates and pickup confirmation.</p>
+      {telegramLinked && <aside className="telegram-opt-in telegram-opt-in-linked" aria-label="Telegram ticket notifications">
         <span className="telegram-opt-in-icon"><TelegramLogo size={28} weight="fill" aria-hidden="true" /></span>
-        <span className="telegram-opt-in-copy"><strong>Telegram is connected</strong><span>No extra steps. We'll message the Telegram chat linked on this browser when your ticket is ready for pickup or if it's declined.</span></span>
+        <span className="telegram-opt-in-copy"><strong>Telegram is connected</strong><span>We'll message you when the ticket is ready or declined. After collection, use /pickup in Telegram to close it.</span></span>
       </aside>}
-      {telegramLink && <aside className={`telegram-opt-in${telegramRequested ? ' telegram-opt-in-requested' : ''}`} aria-label="Telegram ticket notifications">
+      {telegramLink && !telegramLinked && <aside className="telegram-opt-in telegram-opt-in-requested" aria-label="Required Telegram ticket connection">
         <span className="telegram-opt-in-icon"><TelegramLogo size={28} weight="fill" aria-hidden="true" /></span>
-        <span className="telegram-opt-in-copy"><strong>{telegramRequested ? 'Finish linking Telegram' : 'Get notified when your ticket is ready'}</strong><span>Tap the button, then press Start in Telegram. That's it. We'll message you when it's ready for pickup or if it's declined.</span></span>
-        <a className="button telegram-button" href={telegramLink} target="_blank" rel="noreferrer">{telegramRequested ? 'Continue to Telegram' : 'Get Telegram updates'} <ArrowRight weight="bold" aria-hidden="true" /></a>
+        <span className="telegram-opt-in-copy"><strong>Required: finish linking Telegram</strong><span>Open Telegram and press Start. Keep this page open; confirmation can take up to one minute.</span></span>
+        <a className="button telegram-button" href={telegramLink} target="_blank" rel="noreferrer">Continue to Telegram <ArrowRight weight="bold" aria-hidden="true" /></a>
         <TelegramQrCode link={telegramLink} />
       </aside>}
       <div className="receipt-actions">
         <button className="button button-secondary" type="button" onClick={() => window.print()}><Printer aria-hidden="true" /> Print receipt</button>
-        <button className="button button-primary" type="button" onClick={onStartAnother}>Open another ticket <ArrowRight aria-hidden="true" /></button>
+        <button className="button button-primary" type="button" onClick={onStartAnother} disabled={!telegramLinked}>Open another ticket <ArrowRight aria-hidden="true" /></button>
       </div>
+      {!telegramLinked && <p className="receipt-help" role="status">Open another ticket after Telegram confirms this connection.</p>}
     </section>
   );
 }
@@ -206,7 +208,6 @@ export function TicketForm({ machine, onChangeMachine, onTicket }) {
   const [notice, setNotice] = useState({ text: '', error: false });
   const [canRetry, setCanRetry] = useState(false);
   const [ticket, setTicket] = useState(null);
-  const [telegramRequested, setTelegramRequested] = useState(false);
   const [telegramRemembered, setTelegramRemembered] = useState(() => Boolean(readTelegramDeviceKey()));
 
   const showNotice = (text, error = true) => {
@@ -224,6 +225,32 @@ export function TicketForm({ machine, onChangeMachine, onTicket }) {
     window.addEventListener('beforeunload', warn);
     return () => window.removeEventListener('beforeunload', warn);
   }, [submitting]);
+
+  useEffect(() => {
+    if (!ticket || ticket.telegramLinked === true || !SHEETS_API_URL) return undefined;
+    let cancelled = false;
+    let timer;
+    const refreshTelegram = async () => {
+      try {
+        const refreshed = await trackSheetsTicket(SHEETS_API_URL, { requestKey: requestKey.current });
+        if (cancelled) return;
+        setTicket(current => ({ ...current, ...refreshed, machine, department: current.department }));
+        if (refreshed.telegramLinked === true) {
+          setTelegramRemembered(true);
+          return;
+        }
+      } catch {
+        // The ticket is already saved. Keep checking while Apps Script processes
+        // the Telegram Start command instead of replacing the receipt with an error.
+      }
+      if (!cancelled) timer = window.setTimeout(refreshTelegram, 3000);
+    };
+    timer = window.setTimeout(refreshTelegram, 1500);
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [ticket?.ticketNumber, ticket?.telegramLinked, machine]);
 
   const addFiles = incoming => {
     const incomingFiles = Array.from(incoming);
@@ -280,6 +307,10 @@ export function TicketForm({ machine, onChangeMachine, onTicket }) {
       showNotice('The hosted ticket service is not connected. Use the local workshop site to submit this request.');
       return;
     }
+    if (!SHEETS_API_URL) {
+      showNotice('Telegram is required. Submit this request from the live Google-connected workshop site.');
+      return;
+    }
     const data = new FormData(formRef.current);
     data.delete('files');
     setSubmitting(true);
@@ -295,7 +326,7 @@ export function TicketForm({ machine, onChangeMachine, onTicket }) {
           requestKey: requestKey.current,
           startedAt: startedAt.current,
           website: '',
-          ...(telegramRequested ? { telegramDeviceKey: telegramDeviceKey() } : {}),
+          telegramDeviceKey: telegramDeviceKey(),
         }, files, setProgress);
         submittedTicket = { ...submittedTicket, machine, department: details.department };
       } else {
@@ -321,7 +352,6 @@ export function TicketForm({ machine, onChangeMachine, onTicket }) {
     startedAt.current = Date.now();
     setFiles([]);
     setTicket(null);
-    setTelegramRequested(false);
     setTelegramRemembered(Boolean(readTelegramDeviceKey()));
     setNotice({ text: '', error: false });
     setCanRetry(false);
@@ -330,7 +360,7 @@ export function TicketForm({ machine, onChangeMachine, onTicket }) {
   };
 
   if (ticket) {
-    return <TicketReceipt ticket={ticket} onStartAnother={startAnother} telegramRequested={telegramRequested} />;
+    return <TicketReceipt ticket={ticket} onStartAnother={startAnother} />;
   }
 
   return (
@@ -387,19 +417,18 @@ export function TicketForm({ machine, onChangeMachine, onTicket }) {
         </fieldset>
 
         <fieldset className="form-card telegram-form-card">
-          <legend>Ticket updates</legend>
-          <label className={`telegram-form-choice${telegramRequested ? ' selected' : ''}`}>
-            <input type="checkbox" checked={telegramRequested} onChange={event => setTelegramRequested(event.target.checked)} />
+          <legend>Telegram <span>Required</span></legend>
+          <div className="telegram-form-choice selected">
             <span className="telegram-form-icon"><TelegramLogo size={27} weight="fill" aria-hidden="true" /></span>
-            <span className="telegram-form-copy"><strong>Link Telegram to this ticket</strong><span>Optional. Get a message when it's ready. After you submit, tap one button or scan a QR code.</span></span>
-            <span className="telegram-form-state">{telegramRequested ? 'Selected' : 'Optional'}</span>
-          </label>
-          {telegramRemembered && <p className="telegram-form-remembered">Already linked on this browser? Your ticket connects automatically. On a shared computer, <button type="button" onClick={() => { forgetTelegramDevice(); setTelegramRemembered(false); }}>use a different Telegram account</button>.</p>}
+            <span className="telegram-form-copy"><strong>Telegram is required for every ticket</strong><span>After submitting, open the secure Telegram link and press Start. Telegram sends status updates and lets you confirm pickup.</span></span>
+            <span className="telegram-form-state">Required</span>
+          </div>
+          {telegramRemembered && <p className="telegram-form-remembered">This browser has a linked Telegram account, so the ticket may connect automatically. On a shared computer, <button type="button" onClick={() => { forgetTelegramDevice(); setTelegramRemembered(false); }}>use a different Telegram account</button>.</p>}
         </fieldset>
 
         <div className="submit-area">
           <p>A karyakar reviews each request before it enters the queue. Timing depends on staff and material availability.</p>
-          <button className="button button-primary submit-button" type="submit" disabled={submitting}>{submitting ? 'Submitting ticket' : canRetry ? 'Try again' : telegramRequested ? 'Submit and link Telegram' : 'Submit ticket'} <ArrowRight weight="bold" aria-hidden="true" /></button>
+          <button className="button button-primary submit-button" type="submit" disabled={submitting}>{submitting ? 'Submitting ticket' : canRetry ? 'Try again' : 'Submit and link Telegram'} <ArrowRight weight="bold" aria-hidden="true" /></button>
         </div>
         {submitting && <progress max="100" value={progress} aria-label={`Upload progress: ${progress}%`} />}
         {notice.text && <p ref={noticeRef} id="ticket-form-notice" className={notice.error ? 'notice error' : 'notice'} role={notice.error ? 'alert' : 'status'} tabIndex="-1">{notice.text}</p>}

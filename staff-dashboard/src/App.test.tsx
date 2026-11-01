@@ -40,6 +40,29 @@ test('a failed refresh shows stale-data warning and disables starting a job', as
   expect(screen.getByRole('button',{name:'Start this job'})).toBeDisabled();
 });
 
+test('archives closed tickets and keeps them available in the Archive view', async () => {
+  const closed={...ticket('closed','P-0004','printer'),status:'collected',revision:6,history:[{status:'collected',at:'2026-10-22T12:00:00Z'}]};
+  const archived={...ticket('old','P-0005','printer'),status:'archived',revision:7,history:[{status:'archived',at:'2026-10-22T13:00:00Z'}]};
+  jest.spyOn(window,'confirm').mockReturnValue(true);
+  (global.fetch as jest.Mock).mockImplementation((_url:string, options?:RequestInit) => {
+    if (options?.method === 'PATCH') {
+      const body=JSON.parse(String(options.body));
+      expect(body).toEqual(expect.objectContaining({status:'archived',expectedRevision:6}));
+      return response({ticket:{...closed,status:'archived',revision:7,history:[...closed.history,{status:'archived',at:'2026-10-22T14:00:00Z'}]}});
+    }
+    return response({tickets:[closed,archived],source:'google',updatedAt:'2026-10-22T12:00:00Z'});
+  });
+  render(<App/>); await screen.findByText('Printing requests');
+  fireEvent.click(screen.getByRole('button',{name:'History'}));
+  fireEvent.click(screen.getByRole('button',{name:'P-0004'}));
+  fireEvent.click(screen.getByRole('button',{name:'Archive ticket'}));
+  await waitFor(()=>expect(global.fetch).toHaveBeenCalledWith('/api/tickets/closed',expect.objectContaining({method:'PATCH'})));
+  await waitFor(()=>expect(screen.queryByRole('dialog',{name:'Ticket P-0004'})).not.toBeInTheDocument());
+  fireEvent.click(screen.getByRole('button',{name:'Archive (2)'}));
+  expect(screen.getByRole('button',{name:'P-0004'})).toBeInTheDocument();
+  expect(screen.getByRole('button',{name:'P-0005'})).toBeInTheDocument();
+});
+
 test('admins see review inbox while production queue contains approved jobs only', async()=>{
   const pending={...ticket('r','P-0003','printer'),status:'pending-review',paperType:''};
   (global.fetch as jest.Mock).mockImplementation((url:string)=>response(url.endsWith('/api/admin/requests')?{tickets:[pending]}:{tickets:[],role:'admin',source:'google',updatedAt:'2026-10-22T12:00:00Z'}));

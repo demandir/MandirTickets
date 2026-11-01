@@ -35,6 +35,7 @@ const digestBytes = value => Array.from(crypto.createHash('sha256').update(Strin
 const baseTicket = () => ({
   action: 'createTicket',
   requestKey: '0123456789abcdef0123456789abcdef',
+  telegramDeviceKey: 'fedcba9876543210fedcba9876543210',
   startedAt: Date.now() - 2000,
   website: '',
   machine: 'foam',
@@ -56,6 +57,8 @@ test('Apps Script backend validates a complete foam ticket', () => {
   assert.equal(ticket.machine, 'foam');
   assert.equal(ticket.quantity, 2);
   assert.equal(ticket.thickness, 2);
+  assert.equal(ticket.telegramDeviceKey, 'fedcba9876543210fedcba9876543210');
+  assert.throws(() => context.validatePublicTicket_({ ...baseTicket(), telegramDeviceKey: '' }), /Telegram is required/i);
 });
 
 test('Apps Script accepts a ticket without hidden phone or finished size fields', () => {
@@ -121,6 +124,7 @@ test('request-key tracking distinguishes a pending save from a permanent backend
 test('Telegram commands and requester push copy stay scoped to ticket updates', () => {
   assert.deepEqual(JSON.parse(JSON.stringify(context.parseTelegramCommand_('/status@DelMandirDesignbot P-0042'))), { command: 'status', argument: 'P-0042' });
   assert.deepEqual(JSON.parse(JSON.stringify(context.parseTelegramCommand_('/stop'))), { command: 'stop', argument: '' });
+  assert.deepEqual(JSON.parse(JSON.stringify(context.parseTelegramCommand_('/pickup P-0042'))), { command: 'pickup', argument: 'P-0042' });
   assert.equal(context.parseTelegramCommand_('what is my status?'), null);
   assert.equal(context.telegramStatusLabel_('pending-review'), 'Awaiting review');
   assert.equal(context.telegramStatusLabel_('in-progress'), 'In progress');
@@ -130,9 +134,54 @@ test('Telegram commands and requester push copy stay scoped to ticket updates', 
   };
   const ready = context.telegramPushMessage_(poster, 'ready');
   assert.match(ready, /^P-0042 is ready for pickup\.\n📋 Poster printing · Qty 3 · 24 × 36 in\nFor: Diwali stage backdrop\n📎 File: backdrop\.pdf\n/);
+  assert.match(ready, /\/pickup P-0042/);
   assert.match(context.telegramPushMessage_({ ...poster, ticketNumber: 'F-0011', machine: 'foam', thickness: 2 }, 'declined', 'Please upload a sharper PDF.'), /^F-0011 was declined\.\n📋 Foam cutting · Qty 3 · 24 × 36 in · 2 in thick\n[\s\S]*Reason: Please upload a sharper PDF\.$/);
   assert.equal(context.telegramPushMessage_(poster, 'queued'), '');
+  assert.match(context.telegramPushMessage_(poster, 'collected'), /closed.*Pickup has been recorded/i);
   assert.doesNotMatch(ready, /phone|contact|https?:|@|\+1302/i);
+});
+
+test('a requester Telegram pickup confirmation closes a ready ticket with history', () => {
+  const row = Array(32).fill('');
+  row[0] = 'ticket-ready';
+  row[1] = 'P-0042';
+  row[2] = 'Poster printing';
+  row[3] = 'Requester';
+  row[4] = 'Events';
+  row[5] = 'Poster';
+  row[7] = 1;
+  row[12] = 'No rush';
+  row[13] = 'ready';
+  row[16] = '2026-10-30T12:00:00.000Z';
+  row[17] = '2026-10-30T13:00:00.000Z';
+  row[18] = 3;
+  row[27] = JSON.stringify([{ used: 2, waste: 0 }]);
+  row[28] = JSON.stringify([{ status: 'ready', at: row[17] }]);
+  const sheet = {
+    getRange() {
+      return {
+        getValues: () => [row.slice()],
+        setValues(values) { values[0].forEach((value, index) => { row[index] = value; }); },
+      };
+    },
+  };
+  const isolated = loadContext({ SpreadsheetApp: { flush() {} } });
+  isolated.ensureTicketSheet_ = () => sheet;
+  isolated.findRow_ = () => 2;
+
+  const result = isolated.telegramMarkPickedUp_({}, 'ticket-ready');
+  assert.equal(result.ok, true);
+  assert.equal(result.ticket.status, 'collected');
+  assert.equal(row[13], 'collected');
+  assert.equal(row[18], 4);
+  const history = JSON.parse(row[28]);
+  assert.equal(history.at(-1).operator, 'Requester via Telegram');
+  assert.equal(history.at(-1).source, 'requester-telegram');
+
+  const duplicate = isolated.telegramMarkPickedUp_({}, 'ticket-ready');
+  assert.equal(duplicate.ok, true);
+  assert.equal(duplicate.unchanged, true);
+  assert.equal(row[18], 4);
 });
 
 test('Telegram staff group receives the complete formatted submission without requester opt-in', () => {
@@ -1003,7 +1052,10 @@ test('all Drive receipts are verified before any pending file is renamed', () =>
 });
 
 test('duplicate createTicket requests write one Sheet row and reuse the first ticket', () => {
-  const properties = propertiesStore({});
+  const properties = propertiesStore({
+    TELEGRAM_BOT_TOKEN: `123456:${'a'.repeat(30)}`,
+    TELEGRAM_BOT_USERNAME: 'DelMandirDesignbot',
+  });
   let rowWritten = false;
   let fileSaves = 0;
   let dailyIncrements = 0;
