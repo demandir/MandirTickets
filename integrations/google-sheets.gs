@@ -1377,10 +1377,6 @@ function staffAction_(input, lock, publicAccess) {
     if (input.action === 'adminReview') {
       if (ticket.revision !== input.expectedRevision) workshopFail_('This request changed. Refresh before reviewing.',409);
       var result = validateReview(ticket,input.input);
-      if (input.input && input.input.decision === 'approve') {
-        var telegramTicket = decorateTelegramTickets_(book, [ticket])[0];
-        if (!telegramTicket.telegram || !telegramTicket.telegram.linked) workshopFail_('The requester must finish the required Telegram connection before this ticket can be approved.', 409);
-      }
       Object.assign(ticket,result.edits,{status:result.status,reason:result.reason});
       ticket.history.push({status:ticket.status,at:now,operator:result.operator,reason:result.reason,changes:result.changes});
     } else if (input.action === 'staffUsage') {

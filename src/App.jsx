@@ -140,7 +140,7 @@ export function TicketReceipt({ ticket, onStartAnother }) {
       <p className="receipt-label">Ticket number</p>
       <strong className="receipt-number">{ticket.ticketNumber}</strong>
       <p>{machineName(ticket)} · {ticket.department}{ticket.position ? ` · ${ticket.position - 1} ${ticket.position === 2 ? 'job' : 'jobs'} ahead of you` : ''}</p>
-      <p className="receipt-help">A karyakar will check your files and request details before your request joins the staff queue. Telegram is required for ticket updates and pickup confirmation.</p>
+      <p className="receipt-help">Your ticket was sent to the workshop immediately. Telegram is still required for ticket updates and pickup confirmation.</p>
       {telegramLinked && <aside className="telegram-opt-in telegram-opt-in-linked" aria-label="Telegram ticket notifications">
         <span className="telegram-opt-in-icon"><TelegramLogo size={28} weight="fill" aria-hidden="true" /></span>
         <span className="telegram-opt-in-copy"><strong>Telegram is connected</strong><span>We'll message you when the ticket is ready or declined. After collection, use /pickup in Telegram to close it.</span></span>
@@ -420,7 +420,7 @@ export function TicketForm({ machine, onChangeMachine, onTicket }) {
           <legend>Telegram <span>Required</span></legend>
           <div className="telegram-form-choice selected">
             <span className="telegram-form-icon"><TelegramLogo size={27} weight="fill" aria-hidden="true" /></span>
-            <span className="telegram-form-copy"><strong>Telegram is required for every ticket</strong><span>After submitting, open the secure Telegram link and press Start. Telegram sends status updates and lets you confirm pickup.</span></span>
+            <span className="telegram-form-copy"><strong>Telegram is required for every ticket</strong><span>Your ticket goes to staff as soon as you submit it. Then open the secure Telegram link and press Start for status updates and to confirm pickup.</span></span>
             <span className="telegram-form-state">Required</span>
           </div>
           {telegramRemembered && <p className="telegram-form-remembered">This browser has a linked Telegram account, so the ticket may connect automatically. On a shared computer, <button type="button" onClick={() => { forgetTelegramDevice(); setTelegramRemembered(false); }}>use a different Telegram account</button>.</p>}

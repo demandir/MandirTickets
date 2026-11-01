@@ -134,6 +134,13 @@ test('Google review edits details with revision protection, decline reasons and 
   assert.equal(getRows()[0][19],'SECRET12'); assert.equal(getRows()[0][30],'Please send sharper artwork');
   assert.ok(!JSON.stringify(ctx.publicWorkshopQueue_()).includes('Private phone'));
 });
+test('Google review can approve a ticket before the requester finishes Telegram linking',()=>{
+  const {call,getRows}=googleHarness();
+  getRows()[0][13]='pending-review';
+  const approved=call('adminReview',{id:'b',expectedRevision:1,input:{decision:'approve',operator:'Admin'}});
+  assert.equal(approved.ticket.status,'queued');
+  assert.equal(getRows()[0][13],'queued');
+});
 test('review cannot replace local file paths, mutate identifiers, or reuse numbers after moving machines',async t=>{
   const {store}=await setup(t); const a=(await store.create(validateTicket(details,foamFiles),'a')).ticket;
   await assert.rejects(store.review(a.id,{decision:'approve',operator:'Admin',fields:{files:[{storedName:'../../private',originalName:'design.pdf'}]}},1),/belong/);

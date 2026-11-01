@@ -80,6 +80,7 @@ test('customer forms require Telegram linking before the live queue', () => {
     assert.ok(telegram < submit, 'Telegram requirement should appear before submission');
     assert.match(html, /Telegram <span>Required<\/span>/);
     assert.doesNotMatch(html, /type="checkbox"/);
+    assert.match(html, /ticket goes to staff as soon as you submit/i);
     assert.match(html, /confirm pickup/i);
   }
 });
@@ -99,6 +100,7 @@ test('ticket receipt requires the Telegram handoff before another submission', (
   }));
   assert.match(html, /class="telegram-opt-in telegram-opt-in-requested"/);
   assert.match(html, /Required: finish linking Telegram/);
+  assert.match(html, /ticket was sent to the workshop immediately/i);
   assert.match(html, /class="button telegram-button"/);
   assert.match(html, /<button[^>]*disabled=""[^>]*>Open another ticket/);
   assert.match(html, new RegExp(`href="${telegramLink.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}"`));
