@@ -560,8 +560,8 @@ test('Apps Script backend enforces machine-specific file formats', () => {
   assert.throws(() => context.validatePublicTicket_({
     ...baseTicket(),
     machine: 'printer',
-    files: [{ name: 'cut.svg', type: 'image/svg+xml', size: 4, data: 'PHN2Zz4=' }],
-  }), /PDF.*PNG.*TIFF/i);
+    files: [{ name: 'cut.ai', type: 'application/postscript', size: 4, data: 'QUlGSQ==' }],
+  }), /PDF or common image/i);
   assert.throws(() => context.validatePublicTicket_({
     ...baseTicket(),
     files: [{ name: 'photo.jpg', type: 'image/jpeg', size: 4, data: '/9j/2Q==' }],
@@ -570,8 +570,8 @@ test('Apps Script backend enforces machine-specific file formats', () => {
     ...baseTicket(),
     machine: 'printer',
     files: [
-      { name: 'logo.png', type: 'image/png', size: 20, data: 'iVBORw0KGgoAAAAASUVORK5CYII=' },
-      { name: 'photo.tiff', type: 'image/tiff', size: 8, data: 'SUkqAAgAAAA=' },
+      { name: 'art.webp', type: 'image/webp', size: 4, data: 'AAAAAA==' },
+      { name: 'phone.heic', type: 'image/heic', size: 4, data: 'AAAAAA==' },
     ],
   }));
 });
@@ -740,6 +740,30 @@ test('Apps Script re-reads Drive bytes and validates direct print-image and vect
     {},
   ));
 
+  const validWebp = Buffer.alloc(20); validWebp.write('RIFF'); validWebp.writeUInt32LE(validWebp.length - 8, 4); validWebp.write('WEBP', 8); validWebp.write('VP8 ', 12);
+  const validBmp = Buffer.alloc(26); validBmp.write('BM'); validBmp.writeUInt32LE(validBmp.length, 2); validBmp.writeUInt32LE(12, 14);
+  const validDib = Buffer.alloc(12); validDib.writeUInt32LE(12);
+  const validIco = Buffer.alloc(22); validIco.writeUInt16LE(1, 2); validIco.writeUInt16LE(1, 4);
+  const addedImages = [
+    ['animation.gif', Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==', 'base64')],
+    ['art.webp', validWebp],
+    ['bitmap.bmp', validBmp],
+    ['bitmap.dib', validDib],
+    ['modern.avif', Buffer.from('0000001466747970617669660000000061766966', 'hex')],
+    ['phone.heic', Buffer.from('0000001466747970686569630000000068656963', 'hex')],
+    ['phone.heif', Buffer.from('00000014667479706d696631000000006d696631', 'hex')],
+    ['icon.ico', validIco],
+    ['wide-gamut.jxl', Buffer.from('0000000c4a584c200d0a870a', 'hex')],
+  ];
+  addedImages.forEach(([name, content]) => {
+    const imageContext = makeContext(content);
+    assert.doesNotThrow(() => imageContext.inspectDriveFile_(
+      { id: `drive_file_${name}`, name },
+      { size: String(content.length) },
+      {},
+    ), name);
+  });
+
   const benignSvg = Buffer.from('<svg xmlns="http://www.w3.org/2000/svg"><defs><linearGradient id="g"><stop offset="0" stop-color="red"/></linearGradient></defs><rect width="24" height="24" fill="url(#g)"/></svg>');
   const svg = makeContext(benignSvg);
   assert.doesNotThrow(() => svg.inspectDriveFile_(
@@ -779,6 +803,12 @@ test('legacy file inspection matches direct-upload envelopes and accepts arbitra
   assert.throws(() => isolated.inspectFile_('fake.jpg', [0xff, 0xd8, 0x00, 0xff, 0xd9]), /valid JPG/i);
   assert.throws(() => isolated.inspectFile_('cut.png', [...Buffer.from('89504e470d0a1a0a', 'hex')]), /valid PNG/i);
   assert.throws(() => isolated.inspectFile_('fake.tif', [0x49, 0x49, 0, 0]), /valid TIFF/i);
+  assert.throws(() => isolated.inspectFile_('fake.gif', [...Buffer.from('GIF89a;')]), /valid GIF/i);
+  assert.throws(() => isolated.inspectFile_('fake.webp', [...Buffer.from('RIFFbad WEBP')]), /valid WebP/i);
+  assert.throws(() => isolated.inspectFile_('fake.avif', [...Buffer.from('not an avif')]), /valid AVIF/i);
+  assert.throws(() => isolated.inspectFile_('fake.heic', [...Buffer.from('not a heic')]), /valid HEIC/i);
+  assert.throws(() => isolated.inspectFile_('fake.ico', [0, 0, 1, 0, 1, 0]), /valid ICO/i);
+  assert.throws(() => isolated.inspectFile_('fake.jxl', [0xff, 0x0a]), /valid JPEG XL/i);
 
   const exportedSvg = '<?xml version="1.0" encoding="UTF-8"?>\n'
     + '<!-- Generator: a vector editor -->\n'

@@ -28,8 +28,12 @@ test('filename allowlist rejects executables, paths, control characters and over
   assert.equal(validateFilename('photo.JPEG'),'.jpeg');
   assert.equal(validateFilename('transparent.PNG'),'.png');
   assert.equal(validateFilename('large-format.TIFF'),'.tiff');
+  assert.equal(validateFilename('phone.HEIC'),'.heic');
+  assert.equal(validateFilename('animation.gif'),'.gif');
+  assert.equal(validateFilename('modern.avif'),'.avif');
+  assert.equal(validateFilename('wide-gamut.jxl'),'.jxl');
   assert.equal(validateFilename('drawing.dxf'),'.dxf');
-  assert.throws(() => validateFilename('animation.gif'));
+  assert.throws(() => validateFilename('layered.psd'));
 });
 test('any non-empty SVG content validates with a content hash; MIME is not trusted', async t => {
   const content = '<not-even-xml><script src="https://example.invalid/active.js">';
@@ -69,13 +73,30 @@ test('ASCII DXF accepts paired finite groups and rejects malformed or non-finite
   }
 });
 test('print-file envelope checks accept supported images and reject spoofed or truncated uploads', async t => {
-  for (const [name, content] of [['empty.pdf',''],['fake.pdf','<script>alert(1)</script>'],['cut.pdf','%PDF-1.7\nmissing footer'],['image.jpg',Buffer.from('ffd8ff','hex')],['image.png',Buffer.from('89504e470d0a1a0a','hex')],['image.tif',Buffer.from('49490000','hex')]]) {
+  for (const [name, content] of [['empty.pdf',''],['fake.pdf','<script>alert(1)</script>'],['cut.pdf','%PDF-1.7\nmissing footer'],['image.jpg',Buffer.from('ffd8ff','hex')],['image.png',Buffer.from('89504e470d0a1a0a','hex')],['image.gif','GIF89a'],['image.webp','RIFFbad WEBP'],['image.bmp','BM'],['image.avif','not an avif'],['image.heic','not a heic'],['image.ico',Buffer.from('00000100','hex')],['image.jxl',Buffer.from('0000000c','hex')],['image.tif',Buffer.from('49490000','hex')]]) {
     await assert.rejects(validateUpload(await fixture(t,name,content)),error => error.status===400);
   }
   // Envelope success deliberately does NOT mean a complete PDF parse or a malware verdict.
+  const webp = Buffer.alloc(20); webp.write('RIFF'); webp.writeUInt32LE(webp.length - 8, 4); webp.write('WEBP', 8); webp.write('VP8 ', 12);
+  const bmp = Buffer.alloc(26); bmp.write('BM'); bmp.writeUInt32LE(bmp.length, 2); bmp.writeUInt32LE(12, 14);
+  const dib = Buffer.alloc(12); dib.writeUInt32LE(12);
+  const avif = Buffer.from('0000001466747970617669660000000061766966', 'hex');
+  const heic = Buffer.from('0000001466747970686569630000000068656963', 'hex');
+  const ico = Buffer.alloc(22); ico.writeUInt16LE(1, 2); ico.writeUInt16LE(1, 4);
   assert.equal((await validateUpload(await fixture(t,'envelope.pdf','%PDF-1.7\n%%EOF\n'))).scan,'not-configured');
+  assert.equal((await validateUpload(await fixture(t,'photo.jfif',Buffer.from('ffd8ff00ffd9','hex')))).validation,'screened-v1');
   assert.equal((await validateUpload(await fixture(t,'image.png',Buffer.from('89504e470d0a1a0a0000000049454e44ae426082','hex')))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'image.apng',Buffer.from('89504e470d0a1a0a0000000049454e44ae426082','hex')))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'image.gif',Buffer.from('R0lGODlhAQABAIAAAAAAAP///ywAAAAAAQABAAACAUwAOw==','base64')))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'image.webp',webp))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'image.bmp',bmp))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'image.dib',dib))).validation,'screened-v1');
   assert.equal((await validateUpload(await fixture(t,'image.tiff',Buffer.from('49492a0008000000','hex')))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'image.avif',avif))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'image.heic',heic))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'image.heif',heic))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'image.ico',ico))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'image.jxl',Buffer.from('0000000c4a584c200d0a870a','hex')))).validation,'screened-v1');
 });
 test('malware screening fails closed when required, unavailable, or rejected', async t => {
   const file = await fixture(t,'safe.svg',svg('<rect width="1" height="1"/>'));

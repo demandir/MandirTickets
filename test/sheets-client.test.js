@@ -144,9 +144,9 @@ async function withBrowserPipeline({ jsonp, xhr = [], onPost = () => {} }, opera
 }
 
 test('client accepts only the formats for the selected request type', () => {
-  assert.doesNotThrow(() => validateSheetsFiles([file('poster.pdf'), file('photo.JPG'), file('logo.png'), file('scan.TIFF')], 'printer'));
+  assert.doesNotThrow(() => validateSheetsFiles([file('poster.pdf'), file('phone.HEIC'), file('art.webp'), file('modern.avif'), file('icon.ico')], 'printer'));
   assert.doesNotThrow(() => validateSheetsFiles([file('letters.svg'), file('layout.dxf')], 'foam'));
-  assert.throws(() => validateFileTypes([file('layout.svg')], 'printer'), /PDF.*PNG.*TIFF/i);
+  assert.throws(() => validateFileTypes([file('layout.ai')], 'printer'), /PDF or common image/i);
   assert.throws(() => validateFileTypes([file('photo.jpg')], 'foam'), /SVG or DXF/i);
 });
 
@@ -163,7 +163,7 @@ test('small vector files are encoded losslessly for server-side Drive storage', 
 test('Google Sheets client enforces count, extension, per-file, and total limits', () => {
   assert.throws(() => validateSheetsFiles([], 'foam'), /at least one artwork file/i);
   assert.throws(() => validateSheetsFiles(Array.from({ length: SHEETS_MAX_FILES + 1 }, (_, index) => file(`${index}.pdf`)), 'printer'), /no more than/i);
-  assert.throws(() => validateSheetsFiles([file('installer.exe')], 'printer'), /PDF.*PNG.*TIFF/i);
+  assert.throws(() => validateSheetsFiles([file('installer.exe')], 'printer'), /PDF or common image/i);
   assert.throws(() => validateSheetsFiles([file('oversize.pdf', SHEETS_MAX_FILE_BYTES + 1)], 'printer'), /200 MB/i);
   assert.throws(() => validateSheetsFiles([file('oversize.svg', SHEETS_MAX_VECTOR_FILE_BYTES + 1)], 'foam'), /10 MB/i);
   assert.throws(() => validateSheetsFiles([file('one.pdf', SHEETS_MAX_TOTAL_BYTES), file('two.pdf', 1)], 'printer'), /200 MB/i);

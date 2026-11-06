@@ -41,10 +41,10 @@ test('validates department, purpose, printer width, quantity and required artwor
   assert.deepEqual({phone:validateTicket(withoutOptionalFields,foamFiles).phone,width:validateTicket(withoutOptionalFields,foamFiles).width,length:validateTicket(withoutOptionalFields,foamFiles).length},{phone:'',width:0,length:0});
 });
 test('validates file formats for each machine',()=>{
-  assert.throws(()=>validateTicket({...input,machine:'printer'},[{originalName:'cut.svg'}]),/PDF.*PNG.*TIFF/i);
+  assert.throws(()=>validateTicket({...input,machine:'printer'},[{originalName:'cut.ai'}]),/PDF or common image/i);
   assert.throws(()=>validateTicket(input,[{originalName:'photo.jpg'}]),/SVG or DXF/i);
   assert.doesNotThrow(()=>validateTicket({...input,machine:'printer'},[{originalName:'poster.JPG'}]));
-  assert.doesNotThrow(()=>validateTicket({...input,machine:'printer'},[{originalName:'transparent.png'},{originalName:'photo.TIF'}]));
+  assert.doesNotThrow(()=>validateTicket({...input,machine:'printer'},[{originalName:'transparent.png'},{originalName:'phone.HEIC'},{originalName:'art.webp'}]));
   assert.doesNotThrow(()=>validateTicket(input,[{originalName:'cut.DXF'}]));
 });
 test('status changes move queue positions, hide closed jobs, preserve history and private data',async t=>{

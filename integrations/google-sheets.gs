@@ -491,7 +491,7 @@ function neededByDate_(value) {
 function validateFiles_(files, machine) {
   if (!Array.isArray(files) || files.length > MAX_FILES) throw new Error('Attach no more than ' + MAX_FILES + ' files.');
   var format = machine === 'printer'
-    ? { pattern: /\.(pdf|png|jpe?g|tiff?)$/i, message: 'Poster printing accepts PDF, JPG, PNG, or TIFF files only.' }
+    ? { pattern: /\.(pdf|jpg|jpeg|jpe|jfif|png|apng|gif|webp|bmp|dib|tif|tiff|avif|heic|heif|hif|ico|jxl)$/i, message: 'Poster printing accepts PDF or common image files only.' }
     : machine === 'foam'
       ? { pattern: /\.(svg|dxf)$/i, message: 'Foam cutting accepts SVG or DXF files only.' }
       : null;
@@ -635,6 +635,73 @@ function isTiffHeader_(bytes) {
   return ['73,73,42,0', '77,77,0,42', '73,73,43,0', '77,77,0,43'].indexOf(header) !== -1;
 }
 
+function matchesAscii_(bytes, offset, value) {
+  if (bytes.length < offset + value.length) return false;
+  for (var index = 0; index < value.length; index++) {
+    if (byte_(bytes[offset + index]) !== value.charCodeAt(index)) return false;
+  }
+  return true;
+}
+
+function uint16Le_(bytes, offset) {
+  return byte_(bytes[offset]) + byte_(bytes[offset + 1]) * 256;
+}
+
+function uint32Le_(bytes, offset) {
+  return byte_(bytes[offset]) + byte_(bytes[offset + 1]) * 256 + byte_(bytes[offset + 2]) * 65536 + byte_(bytes[offset + 3]) * 16777216;
+}
+
+function uint32Be_(bytes, offset) {
+  return byte_(bytes[offset]) * 16777216 + byte_(bytes[offset + 1]) * 65536 + byte_(bytes[offset + 2]) * 256 + byte_(bytes[offset + 3]);
+}
+
+function asciiBrand_(bytes, offset) {
+  if (bytes.length < offset + 4) return '';
+  return String.fromCharCode(byte_(bytes[offset]), byte_(bytes[offset + 1]), byte_(bytes[offset + 2]), byte_(bytes[offset + 3]));
+}
+
+function isIsoBmff_(bytes, allowedBrands, size) {
+  if (bytes.length < 16 || !matchesAscii_(bytes, 4, 'ftyp')) return false;
+  var boxSize = uint32Be_(bytes, 0);
+  if (boxSize < 16 || boxSize > size) return false;
+  if (allowedBrands.indexOf(asciiBrand_(bytes, 8)) !== -1) return true;
+  for (var offset = 16; offset + 4 <= Math.min(boxSize, bytes.length); offset += 4) {
+    if (allowedBrands.indexOf(asciiBrand_(bytes, offset)) !== -1) return true;
+  }
+  return false;
+}
+
+function inspectImageEnvelope_(name, prefix, suffix, size) {
+  var lower = name.toLowerCase();
+  if (/\.(jpg|jpeg|jpe|jfif)$/.test(lower) && !(byte_(prefix[0]) === 255 && byte_(prefix[1]) === 216 && byte_(prefix[2]) === 255 && byte_(suffix[suffix.length - 2]) === 255 && byte_(suffix[suffix.length - 1]) === 217)) {
+    throw new Error('A JPEG attachment is not a valid JPG/JPEG file.');
+  }
+  if (/\.(png|apng)$/.test(lower) && !isPngEnvelope_(prefix, suffix)) throw new Error('A PNG attachment is incomplete or is not a valid PNG.');
+  if (lower.endsWith('.gif') && !(size >= 14 && (matchesAscii_(prefix, 0, 'GIF87a') || matchesAscii_(prefix, 0, 'GIF89a')) && byte_(suffix[suffix.length - 1]) === 59)) {
+    throw new Error('A GIF attachment is incomplete or is not a valid GIF.');
+  }
+  if (lower.endsWith('.webp') && !(size >= 20 && matchesAscii_(prefix, 0, 'RIFF') && matchesAscii_(prefix, 8, 'WEBP')
+    && (matchesAscii_(prefix, 12, 'VP8 ') || matchesAscii_(prefix, 12, 'VP8L') || matchesAscii_(prefix, 12, 'VP8X'))
+    && uint32Le_(prefix, 4) === size - 8 && uint32Le_(prefix, 16) <= size - 20)) {
+    throw new Error('A WebP attachment is incomplete or is not a valid WebP.');
+  }
+  if (lower.endsWith('.bmp') && !(size >= 26 && matchesAscii_(prefix, 0, 'BM') && uint32Le_(prefix, 2) === size && [12, 40, 52, 56, 64, 108, 124].indexOf(uint32Le_(prefix, 14)) !== -1)) {
+    throw new Error('A BMP attachment is incomplete or is not a valid BMP.');
+  }
+  if (lower.endsWith('.dib') && !([12, 40, 52, 56, 64, 108, 124].indexOf(uint32Le_(prefix, 0)) !== -1 && size >= uint32Le_(prefix, 0))) throw new Error('A DIB attachment is not a valid DIB.');
+  if (/\.tiff?$/.test(lower) && !isTiffHeader_(prefix)) throw new Error('A TIFF attachment is not a valid TIFF.');
+  if (lower.endsWith('.avif') && !isIsoBmff_(prefix, ['avif', 'avis'], size)) throw new Error('An AVIF attachment is not a valid AVIF.');
+  if (lower.endsWith('.heic') && !isIsoBmff_(prefix, ['heic', 'heix', 'hevc', 'hevx', 'heis', 'hevm'], size)) throw new Error('A HEIC attachment is not a valid HEIC.');
+  if (/\.(heif|hif)$/.test(lower) && !isIsoBmff_(prefix, ['mif1', 'msf1', 'heic', 'heix', 'hevc', 'hevx', 'heis', 'hevm'], size)) throw new Error('A HEIF attachment is not a valid HEIF.');
+  var iconCount = uint16Le_(prefix, 4);
+  if (lower.endsWith('.ico') && !(size >= 6 + iconCount * 16 && byte_(prefix[0]) === 0 && byte_(prefix[1]) === 0 && byte_(prefix[2]) === 1 && byte_(prefix[3]) === 0 && iconCount > 0)) {
+    throw new Error('An ICO attachment is not a valid ICO.');
+  }
+  if (lower.endsWith('.jxl') && !((size > 2 && byte_(prefix[0]) === 255 && byte_(prefix[1]) === 10) || [0, 0, 0, 12, 74, 88, 76, 32, 13, 10, 135, 10].every(function(value, index) { return byte_(prefix[index]) === value; }))) {
+    throw new Error('A JPEG XL attachment is not a valid JPEG XL.');
+  }
+}
+
 function inspectDriveFile_(file, metadata, uploaded) {
   var lower = file.name.toLowerCase();
   var size = Number(metadata.size);
@@ -644,7 +711,7 @@ function inspectDriveFile_(file, metadata, uploaded) {
     inspectFile_(file.name, vectorBytes);
     return;
   }
-  var prefix = readDriveRange_(file.id, 0, Math.min(size - 1, 15), size);
+  var prefix = readDriveRange_(file.id, 0, Math.min(size - 1, 63), size);
   var suffix = readDriveRange_(file.id, Math.max(0, size - 2048), size - 1, size);
   if (lower.endsWith('.pdf')) {
     var header = Utilities.newBlob(prefix).getDataAsString('ISO-8859-1');
@@ -652,11 +719,7 @@ function inspectDriveFile_(file, metadata, uploaded) {
     if (!/^%PDF-(1\.[0-7]|2\.0)[\r\n ]/.test(header) || !/%%EOF\s*$/.test(footer)) throw new Error('A PDF attachment is incomplete or is not a valid PDF.');
     return;
   }
-  if (/\.jpe?g$/.test(lower) && !(byte_(prefix[0]) === 255 && byte_(prefix[1]) === 216 && byte_(prefix[2]) === 255 && byte_(suffix[suffix.length - 2]) === 255 && byte_(suffix[suffix.length - 1]) === 217)) {
-    throw new Error('A JPG attachment is not a valid JPG.');
-  }
-  if (lower.endsWith('.png') && !isPngEnvelope_(prefix, suffix)) throw new Error('A PNG attachment is incomplete or is not a valid PNG.');
-  if (/\.tiff?$/.test(lower) && !isTiffHeader_(prefix)) throw new Error('A TIFF attachment is not a valid TIFF.');
+  inspectImageEnvelope_(file.name, prefix, suffix, size);
 }
 
 function beginUpload_(params) {
@@ -817,9 +880,7 @@ function inspectFile_(name, bytes) {
     var footer = Utilities.newBlob(bytes.slice(-2048)).getDataAsString('ISO-8859-1');
     if (!/^%PDF-(1\.[0-7]|2\.0)[\r\n ]/.test(header) || !/%%EOF\s*$/.test(footer)) throw new Error('A PDF attachment is incomplete or is not a valid PDF.');
   }
-  if (lower.endsWith('.png') && !isPngEnvelope_(bytes, bytes)) throw new Error('A PNG attachment is incomplete or is not a valid PNG.');
-  if (/\.jpe?g$/.test(lower) && !(byte_(bytes[0]) === 255 && byte_(bytes[1]) === 216 && byte_(bytes[2]) === 255 && byte_(bytes[bytes.length - 2]) === 255 && byte_(bytes[bytes.length - 1]) === 217)) throw new Error('A JPG attachment is not a valid JPG.');
-  if (/\.tiff?$/.test(lower) && !isTiffHeader_(bytes)) throw new Error('A TIFF attachment is not a valid TIFF.');
+  inspectImageEnvelope_(name, bytes.slice(0, 64), bytes.slice(-2048), bytes.length);
   if (lower.endsWith('.dxf')) {
     var text = Utilities.newBlob(bytes).getDataAsString('UTF-8');
     if (text.indexOf('\uFFFD') !== -1) throw new Error('ASCII DXF files must use valid UTF-8 text.');
