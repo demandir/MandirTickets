@@ -398,8 +398,8 @@ export function TicketForm({ machine, onChangeMachine, onTicket }) {
           <div className="dropzone" onDragOver={event => event.preventDefault()} onDrop={event => { event.preventDefault(); addFiles(event.dataTransfer.files); }}>
             <UploadSimple size={30} weight="duotone" aria-hidden="true" />
             <strong>Choose files or drop them here</strong>
-            <small>{machine === 'printer' ? 'PDF or common image files' : 'SVG or DXF (10 MB per vector file)'} · up to 200 MB total</small>
-            <input type="file" name="files" accept={machine === 'printer' ? '.pdf,.jpg,.jpeg,.jpe,.jfif,.png,.apng,.gif,.webp,.bmp,.dib,.tif,.tiff,.avif,.heic,.heif,.hif,.ico,.jxl' : '.svg,.dxf'} multiple required={files.length === 0} onChange={event => { addFiles(event.target.files); event.target.value = ''; }} aria-label="Upload artwork files" />
+            <small>{machine === 'printer' ? 'Any file type' : 'SVG or DXF (10 MB per vector file)'} · up to 200 MB total</small>
+            <input type="file" name="files" accept={machine === 'foam' ? '.svg,.dxf' : undefined} multiple required={files.length === 0} onChange={event => { addFiles(event.target.files); event.target.value = ''; }} aria-label="Upload artwork files" />
           </div>
 
           {files.length > 0 && (

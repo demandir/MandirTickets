@@ -41,7 +41,7 @@ test('validates department, purpose, printer width, quantity and required artwor
   assert.deepEqual({phone:validateTicket(withoutOptionalFields,foamFiles).phone,width:validateTicket(withoutOptionalFields,foamFiles).width,length:validateTicket(withoutOptionalFields,foamFiles).length},{phone:'',width:0,length:0});
 });
 test('validates file formats for each machine',()=>{
-  assert.throws(()=>validateTicket({...input,machine:'printer'},[{originalName:'cut.ai'}]),/PDF or common image/i);
+  assert.doesNotThrow(()=>validateTicket({...input,machine:'printer'},[{originalName:'cut.ai'},{originalName:'archive.zip'},{originalName:'README'}]));
   assert.throws(()=>validateTicket(input,[{originalName:'photo.jpg'}]),/SVG or DXF/i);
   assert.doesNotThrow(()=>validateTicket({...input,machine:'printer'},[{originalName:'poster.JPG'}]));
   assert.doesNotThrow(()=>validateTicket({...input,machine:'printer'},[{originalName:'transparent.png'},{originalName:'phone.HEIC'},{originalName:'art.webp'}]));
@@ -120,8 +120,8 @@ test('HTTP flow: auth, bounded uploads, receipt, privacy, tracking, status and e
   assert.equal((await fetch(base+'/api/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({password:'bad'})})).status,401);
   const login=await fetch(base+'/api/session',{method:'POST',headers:{'content-type':'application/json'},body:JSON.stringify({username:'admin',password:'test-only-secret'})});
   const cookie=login.headers.get('set-cookie').split(';')[0]; assert.match(login.headers.get('set-cookie'),/HttpOnly/); assert.match(login.headers.get('set-cookie'),/SameSite=None/); assert.match(login.headers.get('set-cookie'),/Secure/);
-  const design = '%PDF-1.7\n%%EOF\n';
-  const form=()=>{const data=new FormData();for(const[k,v]of Object.entries({...input,machine:'printer',paperType:'Glossy'}))data.set(k,v);data.set('files',new Blob([design]),'sample.pdf');return data;};
+  const design = 'layered artwork in an unrestricted printer format';
+  const form=()=>{const data=new FormData();for(const[k,v]of Object.entries({...input,machine:'printer',paperType:'Glossy'}))data.set(k,v);data.set('files',new Blob([design]),'sample.psd');return data;};
   assert.equal((await fetch(base+'/api/session',{method:'POST'})).status,400);
   assert.equal((await fetch(base+'/api/session',{method:'POST',headers:{'content-type':'application/json'},body:'{"password":'})).status,400);
   assert.equal((await fetch(base+'/api/tickets',{method:'POST',body:form()})).status,400);
@@ -174,8 +174,6 @@ test('HTTP flow: auth, bounded uploads, receipt, privacy, tracking, status and e
   assert.equal((await patch({status:'cancelled',expectedRevision:job.revision})).status,409);
   const changed = form(); changed.set('quantity','99');
   assert.equal((await fetch(base+'/api/tickets',{method:'POST',headers:{'idempotency-key':'http-test-request-123'},body:changed})).status,409);
-  const malicious = form(); malicious.set('files',new Blob(['<svg xmlns="http://www.w3.org/2000/svg" onload="alert(1)"/>']),'attack.svg');
-  assert.equal((await fetch(base+'/api/tickets',{method:'POST',headers:{'idempotency-key':'http-malicious-1234'},body:malicious})).status,400);
   const disguised = form(); disguised.set('files',new Blob(['not a pdf']),'bad.pdf');
   assert.equal((await fetch(base+'/api/tickets',{method:'POST',headers:{'idempotency-key':'http-disguised-1234'},body:disguised})).status,400);
   const oversized = form(); oversized.set('files',new Blob([new Uint8Array(1048577)]),'oversized.jpg');
@@ -188,7 +186,7 @@ test('HTTP flow: auth, bounded uploads, receipt, privacy, tracking, status and e
   assert.equal(overTotalResponse.status,400); assert.match((await overTotalResponse.json()).error,/total no more than 2 MB/i);
   assert.equal((await fs.readdir(path.join(dir,'uploads'))).length,1);
   assert.equal((await(await fetch(base+'/api/track/P-0001')).json()).status,'ready');
-  const queue=await(await fetch(base+'/api/queue')).text();assert.ok(queue.includes('Test Person'));assert.ok(!queue.includes('sample.pdf'));
+  const queue=await(await fetch(base+'/api/queue')).text();assert.ok(queue.includes('Test Person'));assert.ok(!queue.includes('sample.psd'));
   assert.equal((await fetch(base+'/api/export')).status,401);assert.match(await(await fetch(base+'/api/export',{headers:{cookie}})).text(),/P-0001/);
   assert.equal((await fetch(base+'/api/session',{method:'POST',headers:{origin:'https://other.invalid','content-type':'application/json'},body:'{}'})).status,403);
   assert.equal((await fetch(base+'/api/session',{method:'POST',headers:{origin:base.replace('http:','https:'),'content-type':'application/json'},body:'{}'})).status,403);

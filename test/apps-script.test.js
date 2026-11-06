@@ -557,11 +557,11 @@ test('Apps Script backend requires artwork for every ticket and rejects bot subm
 });
 
 test('Apps Script backend enforces machine-specific file formats', () => {
-  assert.throws(() => context.validatePublicTicket_({
+  assert.doesNotThrow(() => context.validatePublicTicket_({
     ...baseTicket(),
     machine: 'printer',
     files: [{ name: 'cut.ai', type: 'application/postscript', size: 4, data: 'QUlGSQ==' }],
-  }), /PDF or common image/i);
+  }));
   assert.throws(() => context.validatePublicTicket_({
     ...baseTicket(),
     files: [{ name: 'photo.jpg', type: 'image/jpeg', size: 4, data: '/9j/2Q==' }],

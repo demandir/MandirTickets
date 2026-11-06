@@ -22,8 +22,8 @@ async function fixture(t, name, bytes) {
 const svg = body => `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24">${body}</svg>`;
 const dxf = '0\nSECTION\n2\nENTITIES\n0\nLINE\n10\n0\n20\n0\n11\n24\n21\n12\n0\nENDSEC\n0\nEOF\n';
 
-test('filename allowlist rejects executables, paths, control characters and oversized names', () => {
-  for (const name of ['design.html','design.pdf.exe','../design.pdf','dir\\design.pdf','a\0.pdf','a\n.pdf','C:design.svg','x'.repeat(241)+'.pdf','']) assert.throws(() => validateFilename(name));
+test('filename validation allows arbitrary types but rejects paths, control characters and oversized names', () => {
+  for (const name of ['../design.pdf','dir\\design.pdf','a\0.pdf','a\n.pdf','C:design.svg','x'.repeat(241)+'.pdf','']) assert.throws(() => validateFilename(name));
   assert.equal(validateFilename('Poster final.PDF'),'.pdf');
   assert.equal(validateFilename('photo.JPEG'),'.jpeg');
   assert.equal(validateFilename('transparent.PNG'),'.png');
@@ -33,7 +33,9 @@ test('filename allowlist rejects executables, paths, control characters and over
   assert.equal(validateFilename('modern.avif'),'.avif');
   assert.equal(validateFilename('wide-gamut.jxl'),'.jxl');
   assert.equal(validateFilename('drawing.dxf'),'.dxf');
-  assert.throws(() => validateFilename('layered.psd'));
+  assert.equal(validateFilename('layered.psd'),'.psd');
+  assert.equal(validateFilename('design.pdf.exe'),'.exe');
+  assert.equal(validateFilename('README'),'');
 });
 test('any non-empty SVG content validates with a content hash; MIME is not trusted', async t => {
   const content = '<not-even-xml><script src="https://example.invalid/active.js">';
@@ -97,6 +99,7 @@ test('print-file envelope checks accept supported images and reject spoofed or t
   assert.equal((await validateUpload(await fixture(t,'image.heif',heic))).validation,'screened-v1');
   assert.equal((await validateUpload(await fixture(t,'image.ico',ico))).validation,'screened-v1');
   assert.equal((await validateUpload(await fixture(t,'image.jxl',Buffer.from('0000000c4a584c200d0a870a','hex')))).validation,'screened-v1');
+  assert.equal((await validateUpload(await fixture(t,'layered.psd','arbitrary printer artwork'))).validation,'screened-v1');
 });
 test('malware screening fails closed when required, unavailable, or rejected', async t => {
   const file = await fixture(t,'safe.svg',svg('<rect width="1" height="1"/>'));

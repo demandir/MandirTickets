@@ -45,13 +45,14 @@ export function legacySheetsNotes(value, neededBy) {
 }
 
 const fileRule = machine => {
-  if (machine === 'printer') return { pattern: /\.(pdf|jpg|jpeg|jpe|jfif|png|apng|gif|webp|bmp|dib|tif|tiff|avif|heic|heif|hif|ico|jxl)$/i, message: 'Poster printing accepts PDF or common image files only.' };
+  if (machine === 'printer') return null;
   if (machine === 'foam') return { pattern: /\.(svg|dxf)$/i, message: 'Foam cutting accepts SVG or DXF files only.' };
   throw new Error('Choose a request type before adding files.');
 };
 
 export function validateFileTypes(files, machine) {
   const rule = fileRule(machine);
+  if (!rule) return;
   for (const file of files) {
     if (!rule.pattern.test(file.name)) throw new Error(rule.message);
   }

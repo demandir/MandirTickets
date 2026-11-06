@@ -491,11 +491,11 @@ function neededByDate_(value) {
 function validateFiles_(files, machine) {
   if (!Array.isArray(files) || files.length > MAX_FILES) throw new Error('Attach no more than ' + MAX_FILES + ' files.');
   var format = machine === 'printer'
-    ? { pattern: /\.(pdf|jpg|jpeg|jpe|jfif|png|apng|gif|webp|bmp|dib|tif|tiff|avif|heic|heif|hif|ico|jxl)$/i, message: 'Poster printing accepts PDF or common image files only.' }
+    ? null
     : machine === 'foam'
       ? { pattern: /\.(svg|dxf)$/i, message: 'Foam cutting accepts SVG or DXF files only.' }
       : null;
-  if (!format) throw new Error('Choose a machine.');
+  if (machine !== 'printer' && !format) throw new Error('Choose a machine.');
   var total = 0;
   var legacyTotal = 0;
   return files.map(function(file, index) {
@@ -503,7 +503,7 @@ function validateFiles_(files, machine) {
     var type = String(file && file.type || 'application/octet-stream').slice(0, 100);
     var size = Number(file && file.size);
     if (!name || name.length > 180 || /[\\/\u0000-\u001f]/.test(name)) throw new Error('Use a safe filename under 180 characters.');
-    if (!format.pattern.test(name)) throw new Error(format.message);
+    if (format && !format.pattern.test(name)) throw new Error(format.message);
     if (!Number.isSafeInteger(size) || size < 1 || size > MAX_FILE_BYTES) throw new Error('Each file must be 200 MB or smaller.');
     if (/\.(svg|dxf)$/i.test(name) && size > MAX_VECTOR_FILE_BYTES) throw new Error('SVG and DXF files must be 10 MB or smaller so their full contents can be checked.');
     total += size;
