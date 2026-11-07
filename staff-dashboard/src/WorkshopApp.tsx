@@ -1,6 +1,5 @@
 import { FormEvent, useCallback, useEffect, useRef, useState } from 'react';
 import './WorkshopApp.css';
-import { GooglePagesError, googlePagesRequest, googleUsageCsv } from './googlePagesApi';
 
 type Machine = 'printer' | 'foam';
 type Status = 'pending-review' | 'declined' | 'queued' | 'in-progress' | 'ready' | 'collected' | 'cancelled' | 'archived';
@@ -8,16 +7,14 @@ type Usage = { requestKey: string; used: number; waste: number; material: string
 type TelegramDelivery = { id: string; audience: 'requester' | 'staff'; status: string; state: string; updatedAt: string; detail?: string };
 type Ticket = { id: string; ticketNumber: string; sequence: number; machine: Machine; status: Status; revision: number; customerName: string; department: string; purpose: string; phone: string; reason?: string; telegram?: { linked: boolean; deliveries: TelegramDelivery[] }; notes: string; neededBy: string; quantity: number; width: number; length: number; thickness: number; paperType: string; createdAt: string; files: { originalName: string; storedName?: string; url?: string }[]; usage?: Usage[]; history?: { status: Status; at: string; operator?:string; reason?:string; changes?:{field:string;before:unknown;after:unknown}[] }[] };
 const API = (process.env.REACT_APP_WORKSHOP_API_URL || '').replace(/\/$/, '');
-const GOOGLE_SCRIPT = (process.env.REACT_APP_GOOGLE_SCRIPT_URL || '').replace(/\/$/, '');
 const REQUEST_SITE = process.env.REACT_APP_REQUEST_SITE_URL || '/';
 const STAFF_HOME = `${process.env.PUBLIC_URL || '/staff'}/`.replace(/\/+$/, '/');
-const STATIC_PAGES_WITHOUT_API = window.location.hostname.endsWith('.github.io') && !API && !GOOGLE_SCRIPT;
+const STATIC_PAGES_WITHOUT_API = window.location.hostname.endsWith('.github.io') && !API;
 const LABEL: Record<Status, string> = { 'pending-review':'Awaiting admin review', declined:'Declined', queued: 'Waiting', 'in-progress': 'In progress', ready: 'Ready for pickup', collected: 'Closed · picked up', cancelled: 'Cancelled', archived: 'Archived' };
 const FIFO = (a: Ticket, b: Ticket) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || a.sequence - b.sequence || a.id.localeCompare(b.id);
 class RequestError extends Error { constructor(message: string, public status: number) { super(message); } }
 async function request(path: string, options: RequestInit = {}) {
   if (STATIC_PAGES_WITHOUT_API) throw new RequestError('The staff page is online, but its private workshop service has not been connected yet.', 503);
-  if (GOOGLE_SCRIPT) return googlePagesRequest(GOOGLE_SCRIPT, path, options);
   const response = await fetch(`${API}${path}`, { ...options, credentials: 'include', headers: { 'Content-Type': 'application/json', ...options.headers }, signal: AbortSignal.timeout(30000) });
   const data = await response.json().catch(() => ({}));
   if (!response.ok) throw new RequestError(data.error || 'The workshop did not confirm this action. Refresh and retry.', response.status);
@@ -49,7 +46,7 @@ export default function WorkshopApp() {
       setRole(data.role || 'staff'); setTickets(data.tickets); setSource(data.source); setUpdated(data.updatedAt); setSignedIn(true); setStale(false); setError('');
     } catch (e) {
       if (generation !== epoch.current) return;
-      if ((e instanceof RequestError || e instanceof GooglePagesError) && e.status === 401) { setSignedIn(false); setTickets([]); }
+      if (e instanceof RequestError && e.status === 401) { setSignedIn(false); setTickets([]); }
       else setError(e instanceof Error ? e.message : 'Unable to load the workshop.');
       setStale(true);
     } finally { loading.current = false; setChecking(false); }
@@ -84,7 +81,7 @@ export default function WorkshopApp() {
       return true;
     } catch (e) {
       setError(e instanceof Error ? e.message : 'The change was not confirmed.'); setStale(true);
-      if ((e instanceof RequestError || e instanceof GooglePagesError) && e.status === 401) { setSignedIn(false); setTickets([]); }
+      if (e instanceof RequestError && e.status === 401) { setSignedIn(false); setTickets([]); }
       return false;
     } finally { mutation.current = false; setBusy(false); }
   }
@@ -103,11 +100,6 @@ export default function WorkshopApp() {
   }
   async function exportUsage() {
     try {
-      if (GOOGLE_SCRIPT) {
-        const url = URL.createObjectURL(new Blob([googleUsageCsv(tickets)], { type: 'text/csv;charset=utf-8' }));
-        const link = document.createElement('a'); link.href = url; link.download = 'mandir-material-usage.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-        return;
-      }
       const response = await fetch(`${API}/api/usage/export`, { credentials: 'include', signal: AbortSignal.timeout(30000) });
       if (!response.ok) throw new Error('Export failed. Sign in again or refresh.');
       const url = URL.createObjectURL(await response.blob()); const link = document.createElement('a'); link.href = url; link.download = 'mandir-material-usage.csv'; link.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);

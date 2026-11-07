@@ -103,7 +103,7 @@ async function withBrowserPipeline({ jsonp, xhr = [], onPost = () => {} }, opera
     },
     clearTimeout() {},
   };
-  globalThis.location = { origin: 'https://shailp08.github.io' };
+  globalThis.location = { origin: 'https://demandir.github.io' };
   globalThis.document = {
     createElement: () => ({ remove() {} }),
     head: {

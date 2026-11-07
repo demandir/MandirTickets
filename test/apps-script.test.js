@@ -493,9 +493,8 @@ test('a transient request-key tracking read failure remains retryable', () => {
   );
 });
 
-test('GitHub Pages staff ticket reads have a JSONP fallback', () => {
+test('the old GitHub Pages JSONP request cannot read staff tickets', () => {
   const isolated = loadContext();
-  isolated.publicStaffList_ = () => ({ ok: true, tickets: [{ id: 'ticket-1', status: 'queued' }] });
   isolated.javascriptResponse_ = (_callback, value) => value;
 
   assert.deepEqual(
@@ -504,7 +503,7 @@ test('GitHub Pages staff ticket reads have a JSONP fallback', () => {
       action: 'staffList',
       publicStaff: 'true',
     } }))),
-    { ok: true, tickets: [{ id: 'ticket-1', status: 'queued' }] },
+    { ok: false, error: 'Unsupported action.' },
   );
 });
 
@@ -975,7 +974,7 @@ test('beginUpload binds Drive ownership metadata and requests an MD5 receipt', (
   });
   const requestKey = 'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb';
 
-  const result = isolated.beginUpload_({
+  const upload = {
     requestKey,
     startedAt: Date.now() - 2000,
     machine: 'printer',
@@ -983,8 +982,11 @@ test('beginUpload binds Drive ownership metadata and requests an MD5 receipt', (
     name: 'poster.pdf',
     type: 'application/pdf',
     size: '4096',
-    origin: 'https://shailp08.github.io',
-  });
+    origin: 'https://demandir.github.io',
+  };
+  assert.throws(() => isolated.beginUpload_({ ...upload, origin: 'https://shailp08.github.io' }), /open the ticket form/i);
+  assert.equal(driveRequest, undefined);
+  const result = isolated.beginUpload_(upload);
 
   assert.equal(result.sessionUrl, 'https://www.googleapis.com/upload/session-id');
   assert.match(driveRequest.url, /fields=.*md5Checksum/i);

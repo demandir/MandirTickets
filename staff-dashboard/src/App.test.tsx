@@ -4,10 +4,11 @@ beforeEach(() => {
   Object.defineProperty(AbortSignal, 'timeout', { configurable:true, value:() => new AbortController().signal });
   global.fetch = jest.fn();
 });
-afterEach(() => jest.restoreAllMocks());
+afterEach(() => { sessionStorage.clear(); jest.restoreAllMocks(); });
 const response = (data: object, status = 200) => Promise.resolve({ ok: status < 400, status, json: async () => data } as Response);
 const ticket = (id: string, number: string, machine: string) => ({ id, ticketNumber:number, machine, sequence:Number(number.slice(2)), status:'queued', revision:1, customerName:'Volunteer', department:'Events', purpose:`Design ${number}`, neededBy:'Today', createdAt:`2026-10-22T10:0${number.endsWith('2') ? '2' : '1'}:00Z`, paperType:'Glossy', thickness:2, width:24, length:36, quantity:1, files:[], notes:'', phone:'' });
 test('requires staff authentication instead of showing prototype tickets', async () => {
+  sessionStorage.setItem('workshop.pagesSession', '1');
   (global.fetch as jest.Mock).mockImplementation(() => response({error:'Sign in to the staff desk.'},401));
   render(<App />);
   expect(await screen.findByText('Welcome to the workshop.')).toBeInTheDocument();

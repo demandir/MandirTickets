@@ -4,6 +4,8 @@ This backend makes the GitHub Pages site operational without publishing the spre
 
 ## Create and deploy the backend
 
+For an existing system, follow the [rollout guide](../docs/workshop-setup.md) to update the current deployment in place.
+
 1. Create a new private Google Sheet named **Mandir Workshop Tickets**.
 2. In that sheet, choose **Extensions → Apps Script**.
 3. Replace the editor contents with [`google-sheets.gs`](google-sheets.gs) and save it.
@@ -13,7 +15,7 @@ This backend makes the GitHub Pages site operational without publishing the spre
 7. In the GitHub repository, open **Settings → Secrets and variables → Actions → Variables** and create `VITE_GOOGLE_SCRIPT_URL` with the `/exec` URL.
 8. Re-run the **Verify and deploy GitHub Pages** workflow.
 
-The workflow also supplies the same Apps Script URL to the staff dashboard under `/staff/`. In this GitHub Pages-only mode, ticket lists are read directly from Apps Script with bounded retries and a JSONP fallback, and staff mutations are sent directly to the same deployment. No Node server or shared secret is required.
+Staff ticket reads and mutations require `WORKSHOP_SHARED_SECRET` in Apps Script and on the authenticated Node server. Keep the secret out of GitHub Pages and the browser bundle.
 
 Never publish the spreadsheet, share the upload folder, commit the deployment URL as source code, or add a client-side secret. The web app is intentionally public so visitors can create tickets and view the live queue; private receipt identifiers remain backend-only.
 
