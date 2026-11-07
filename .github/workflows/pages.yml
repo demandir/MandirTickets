@@ -19,6 +19,8 @@ concurrency:
 jobs:
   verify-and-build:
     runs-on: ubuntu-latest
+    outputs:
+      staff_site_ready: ${{ steps.staff_site.outputs.ready }}
     env:
       VITE_GOOGLE_SCRIPT_URL: ${{ vars.VITE_GOOGLE_SCRIPT_URL }}
     steps:
@@ -47,17 +49,28 @@ jobs:
           VITE_API_BASE_URL: ${{ vars.VITE_API_BASE_URL }}
           VITE_GOOGLE_SCRIPT_URL: ${{ vars.VITE_GOOGLE_SCRIPT_URL }}
           VITE_STAFF_SITE_URL: ${{ vars.VITE_STAFF_SITE_URL }}
-      - name: Configure Pages
+      - name: Check staff URL before publishing Pages
         if: github.ref == 'refs/heads/main'
+        id: staff_site
+        env:
+          STAFF_SITE_URL: ${{ vars.VITE_STAFF_SITE_URL }}
+        run: |
+          if [[ "$STAFF_SITE_URL" =~ [^[:space:]] ]]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::warning::Pages deployment skipped. Set VITE_STAFF_SITE_URL and rerun this workflow."
+          fi
+      - name: Configure Pages
+        if: steps.staff_site.outputs.ready == 'true'
         uses: actions/configure-pages@v6
       - name: Upload Pages artifact
-        if: github.ref == 'refs/heads/main'
+        if: steps.staff_site.outputs.ready == 'true'
         uses: actions/upload-pages-artifact@v5
         with:
           path: dist
 
   deploy:
-    if: github.ref == 'refs/heads/main'
+    if: github.ref == 'refs/heads/main' && needs.verify-and-build.outputs.staff_site_ready == 'true'
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
