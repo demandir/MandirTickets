@@ -72,8 +72,10 @@ function googleHarness() {
 test('Google staff operations authenticate, allow flexible order, save usage once, and preserve existing receipt fields',()=>{
   const {ctx,call,getRows,getImmediateTelegram}=googleHarness();
   assert.equal(call('staffList',{},'bad').status,401);
-  const publicList=ctx.doPost({postData:{contents:JSON.stringify({action:'staffList',publicStaff:true})}});
-  assert.equal(publicList.ok,true); assert.equal(publicList.tickets.length,3);
+  for (const action of ['staffList', 'staffUpdate', 'staffUsage', 'adminReview']) {
+    const response = ctx.doPost({ postData: { contents: JSON.stringify({ action, publicStaff: true }) } });
+    assert.equal(response.status, 401, `${action} requires the server secret`);
+  }
   const list=call('staffList'); assert.equal(list.tickets.length,3);
   assert.equal(list.tickets.find(ticket=>ticket.id==='a').machine,'foam');
   assert.equal(list.tickets.find(ticket=>ticket.id==='p').machine,'printer');

@@ -49,7 +49,7 @@ var TELEGRAM_STALE_SEND_MS = 5 * 60 * 1000;
 var TELEGRAM_SEND_BATCH_SIZE = 20;
 var TELEGRAM_STAFF_MESSAGE_CHUNK = 3700;
 var DEFAULT_UPLOAD_ORIGINS = [
-  'https://shailp08.github.io',
+  'https://demandir.github.io',
   'http://127.0.0.1:4177',
   'http://localhost:4177',
   'http://localhost:5173'
@@ -252,7 +252,7 @@ function doPost(event) {
     if (input.action === 'publicQueue') return jsonResponse_(publicWorkshopQueue_());
     if (['staffList', 'staffUpdate', 'staffUsage', 'adminReview'].indexOf(input.action) !== -1) {
       input._telegramStatusCommitted = false;
-      var staffResponse = staffAction_(input, lock, input.publicStaff === true);
+      var staffResponse = staffAction_(input, lock);
       if (lock.hasLock()) lock.releaseLock();
       if (input._telegramStatusCommitted) {
         try { processTelegramTicketNotifications_(input.id); }
@@ -330,7 +330,6 @@ function doGet(event) {
   try {
     if (params.action === 'queue') return javascriptResponse_(callback, publicWorkshopQueue_());
     if (params.action === 'health') return javascriptResponse_(callback, { ok: true, service: 'Mandir Workshop Tickets' });
-    if (params.action === 'staffList' && params.publicStaff === 'true') return javascriptResponse_(callback, publicStaffList_());
     if (params.action === 'beginUpload') return javascriptResponse_(callback, beginUpload_(params));
     if (params.action !== 'track') return javascriptResponse_(callback, { ok: false, error: 'Unsupported action.' });
     return javascriptResponse_(callback, trackTicket_(params));
@@ -1204,8 +1203,6 @@ function javascriptResponse_(callback, value) {
   return ContentService.createTextOutput(callback + '(' + JSON.stringify(value) + ');').setMimeType(ContentService.MimeType.JAVASCRIPT);
 }
 
-// A private server may authenticate with WORKSHOP_SHARED_SECRET. The GitHub
-// Pages-only build deliberately uses the publicStaff path instead.
 function workshopFail_(message, status) { var error = new Error(message); error.status = status || 400; throw error; }
 const fifoCompare = (a, b) => Date.parse(a.createdAt) - Date.parse(b.createdAt) || (a.sequence || Number(a.ticketNumber?.slice(2))) - (b.sequence || Number(b.ticketNumber?.slice(2))) || a.id.localeCompare(b.id);
 function assertTransition(tickets, ticket, status) {
@@ -1406,24 +1403,10 @@ function decorateTelegramTickets_(book, tickets) {
   });
 }
 
-function publicStaffList_() {
-  var lock = LockService.getScriptLock();
-  lock.waitLock(20000);
+function staffAction_(input, lock) {
   try {
-    var book = openBook_();
-    var sheet = ensureTicketSheet_(book);
-    return { ok: true, tickets: decorateTelegramTickets_(book, workshopRows_(sheet).map(staffTicket_)) };
-  } finally {
-    if (lock.hasLock()) lock.releaseLock();
-  }
-}
-
-function staffAction_(input, lock, publicAccess) {
-  try {
-    if (!publicAccess) {
-      var secret = PropertiesService.getScriptProperties().getProperty('WORKSHOP_SHARED_SECRET');
-      if (!secret || secret.length < 32 || input.secret !== secret) workshopFail_('Staff connection is not authorized.', 401);
-    }
+    var secret = PropertiesService.getScriptProperties().getProperty('WORKSHOP_SHARED_SECRET');
+    if (!secret || secret.length < 32 || input.secret !== secret) workshopFail_('Staff connection is not authorized.', 401);
     lock.waitLock(20000);
     var book = openBook_();
     var sheet = ensureTicketSheet_(book);

@@ -1,12 +1,12 @@
 # Delaware Mandir Workshop Desk
 
-Staff interface for the MandirTickets backend. Printing and foam-cutting tabs share the live Google-backed ticket records directly through Apps Script when hosted on GitHub Pages. The desk includes an admin review inbox, editable request details, approval/decline decisions, flexible work queues, ticket details and artwork links, pickup workflow, material/waste entries, usage totals, and CSV export.
+Staff interface for the MandirTickets backend. Printing and foam-cutting tabs share the live Google-backed ticket records through the authenticated Node server. The desk includes an admin review inbox, editable request details, approval/decline decisions, flexible work queues, ticket details and artwork links, pickup workflow, material/waste entries, usage totals, and CSV export.
 
 ## Build and serve
 
-Use Node 22+. Install dependencies with `npm ci`. From the parent `MandirTickets` folder run `npm run build:pages`; the dashboard is packaged under `/staff/` for GitHub Pages.
+Use Node 22+. From the parent `MandirTickets` folder, run `npm run setup` and `npm start` to build and serve both applications locally. The Node server serves the dashboard at `/staff/`.
 
-See `../docs/workshop-setup.md` for the complete online rollout. The Pages workflow passes `VITE_GOOGLE_SCRIPT_URL` to the staff build as `REACT_APP_GOOGLE_SCRIPT_URL`, so ticket reads and workshop actions do not require a separate Node host. The optional Node-server mode remains available through `STAFF_API_URL`.
+For production, host the Node server over HTTPS and point the public site's `VITE_STAFF_SITE_URL` to that server's `/staff/` page. See the [rollout guide](../docs/workshop-setup.md).
 
 ## Tests
 

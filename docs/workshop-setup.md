@@ -1,6 +1,6 @@
 # Delaware Mandir workshop — setup and rollout
 
-All project files are inside MandirTickets, including the staff-dashboard subfolder. The live GitHub Pages site and its Google Apps Script deployment have **not** been changed.
+The public request site uses GitHub Pages. The staff dashboard uses an authenticated Node server. Both use the existing Google Sheet and Drive folder through Apps Script.
 
 ## Workflow
 
@@ -13,13 +13,9 @@ All project files are inside MandirTickets, including the staff-dashboard subfol
 
 The workflow does not send commands to the printer or foam cutter. Trained volunteers operate the machines. Material totals measure recorded consumption, not remaining inventory, ink levels, or automatic machine telemetry.
 
-## GitHub Pages staff access
+## Staff access
 
-The GitHub Pages deployment connects the staff dashboard directly to Apps Script. Its sign-in screen is a browser-local gate and does not require `WORKSHOP_SHARED_SECRET`, `APP_ORIGIN`, `STAFF_API_URL`, or a Node server. The Pages workflow passes the existing `VITE_GOOGLE_SCRIPT_URL` into both frontend builds.
-
-After entering the staff screen, the dashboard opens the review workspace and production tools. The typed volunteer name is saved as a history label. Ticket reads retry transient Apps Script failures and have a JSONP fallback; writes use a single POST so an uncertain response cannot automatically replay a status or review mutation.
-
-The optional Node deployment remains in the repository but is not required for this mode.
+The Node server serves `/staff/`, verifies staff and admin credentials, and uses a private shared secret to access Apps Script. The Pages `/staff/` URL directs staff to that server using `VITE_STAFF_SITE_URL`. The typed volunteer name is recorded as a history label.
 
 ## Telegram bot
 
@@ -37,33 +33,21 @@ Requester chat IDs and delivery state live in hidden `Telegram Subscriptions` an
 
 ## Existing live system
 
-Public site: [MandirTickets](https://shailp08.github.io/MandirTickets/).
-
-Existing Apps Script deployment:
-
-```
-https://script.google.com/macros/s/AKfycbwpy_peP9T_gYF6blc1EnCvVn-TqvFhXHgiW_d9s5c4sDLx61U56ANTLTawZUQ0ic8p/exec
-```
-
-The existing read-only health check succeeded earlier. The new admin/staff endpoints still require deployment. No live tickets were created or changed during development.
-
-To find the editor, open the ticket Google Sheet and choose **Extensions → Apps Script**. If the Sheet is owned by someone else, its owner must provide access or apply the update. The public deployment URL does not grant editor access.
+The public site is [MandirTickets](https://demandir.github.io/MandirTickets/). Use the production `VITE_GOOGLE_SCRIPT_URL` Actions variable in `demandir/MandirTickets` to identify the existing Apps Script `/exec` deployment. Open the ticket Google Sheet and choose **Extensions → Apps Script** to edit its source.
 
 ## Rollout order
 
-1. Back up the ticket Sheet and existing Apps Script source; retain the previous deployment version for rollback.
-2. Replace the existing ticket script with `MandirTickets/integrations/google-sheets.gs`. Preserve existing Script Properties, Sheet ID, upload-folder ID, and allowed upload origins. **Do not run new-system setup or create a replacement Sheet.**
-3. Put a newly generated bot token directly in the `TELEGRAM_BOT_TOKEN` Script Property, run `setupTelegramNotifications`, add the bot to the private staff group, and complete the one-time group registration command. Do not paste the token into chat or source code.
-4. Publish a new version of the **existing deployment**, keeping its `/exec` URL. The script preserves the legacy email, cost, and SMS columns, and stores Telegram subscriptions/delivery attempts in separate hidden tabs. Existing receipt codes, IDs, timestamps, costs, and Drive links are preserved.
-5. Before opening the staff desk, run `holdUnreviewedQueueForAdminReview` from the script editor if the existing queued backlog has not already been approved. It moves only unstarted queued requests without an approval history into review. Active, ready, collected, and cancelled work is preserved. It is safe to rerun without duplicating these holds. Direct Sheet changes bypass application review, revision controls, and Telegram event generation; use the app afterward.
-6. In GitHub repository variables, retain `VITE_GOOGLE_SCRIPT_URL` with the existing `/exec` URL. `STAFF_API_URL` may remain empty. Run the **Verify and deploy GitHub Pages** workflow; it passes the Apps Script URL to both the public form and staff dashboard.
-7. Verify a clearly labeled real request for each machine with the coordinator: submit, complete the required Telegram handoff, and confirm the private staff group receives each new-ticket alert and can open its Drive links. Confirm `/status`, edit/approve, start, log material, mark ready, collect the work, and send `/pickup` to close it. Archive the closed test ticket and confirm it moves from History to Archive without losing its details. Also test one decline and confirm its reason appears for both the requester and staff group.
+1. Back up the existing ticket Sheet and Apps Script source. Compare the live script with `integrations/google-sheets.gs` before updating it. Preserve the Sheet, Drive folder, and existing Script Properties.
+2. In **Apps Script → Project Settings → Script Properties**, set `WORKSHOP_SHARED_SECRET` to a random value of at least 32 characters. If `UPLOAD_ORIGINS` is configured, include `https://demandir.github.io` as an origin with no path or trailing slash. An explicit list overrides the new default.
+3. Deploy the staff Node server with the settings below and verify staff and admin sign-in at its HTTPS `/staff/` URL. Use the same Apps Script URL and `WORKSHOP_SHARED_SECRET` on the server. Check that the staff dashboard can read the live queue before switching staff over.
+4. Update the existing Apps Script source with `integrations/google-sheets.gs`. In **Deploy → Manage deployments**, edit the existing web app and select **New version** so its `/exec` URL stays the same. The old public staff dashboard loses access as soon as this version is live.
+5. In **GitHub → Settings → Secrets and variables → Actions → Variables**, keep `VITE_GOOGLE_SCRIPT_URL` on the existing deployment and set `VITE_STAFF_SITE_URL` to the new HTTPS dashboard URL including `/staff/`. The Pages workflow skips deployment when the staff URL is blank. Run **Verify and deploy GitHub Pages** on `main` after setting the variable if the branch was already merged.
+6. In the Sheet's **Ticket system** menu, use **Show Telegram setup status** and **Send Telegram staff test**. If the token found in old Git history was never revoked, rotate it through `@BotFather` and store the replacement in the existing `TELEGRAM_BOT_TOKEN` property first.
+7. Submit a clearly labeled PDF test ticket with the coordinator. Confirm the file opens from Drive, an admin can approve the request, staff can record material use and mark it ready, and the requester receives the Telegram message. Use `/pickup` to close it and archive the test ticket.
 
 Google Drive artwork remains private. Give authorized admins/staff access to the existing workshop folder; the app does not make files public.
 
-## Optional private-server configuration
-
-The following is only for a future Node-hosted deployment. It is not needed for the GitHub Pages-only pipeline:
+## Staff server configuration
 
 ```dotenv
 NODE_ENV=production
@@ -77,7 +61,7 @@ STAFF_USERNAME=workshop
 STAFF_PASSWORD=SET-PRIVATELY
 WORKSHOP_GOOGLE_SCRIPT_URL=THE-EXISTING-EXEC-URL
 WORKSHOP_SHARED_SECRET=THE-SAME-VALUE-AS-SCRIPT-PROPERTIES
-PUBLIC_REQUEST_URL=https://shailp08.github.io/MandirTickets/
+PUBLIC_REQUEST_URL=https://demandir.github.io/MandirTickets/
 DATA_DIR=/app/data
 UPLOAD_REQUEST_TIMEOUT_MS=900000
 SHEETS_WEBHOOK_URL=
@@ -86,13 +70,11 @@ SHEETS_SHARED_SECRET=
 
 Mount durable storage at `/app/data` with write access for the application user. Keep one server instance. Sessions last eight hours and are cleared on restart. The Google Sheet remains the source of truth for tickets, review history, material usage, and Telegram delivery state. Google failures never create a replacement local production queue.
 
-The archive contains one `MandirTickets` folder. From inside that folder:
+From the repository root:
 
 ```bash
 docker build -f deploy/Dockerfile -t mandir-workshop .
 ```
-
-The Dockerfile is prepared but has not been built here. The application builds were verified directly. No hosting account has been created or charged, and no live deployment has been performed.
 
 ## Local checks
 
@@ -111,11 +93,3 @@ Dashboard-only tests, from MandirTickets:
 ```bash
 npm run test:staff
 ```
-
-## Verification
-
-Both production builds passed. The backend suite passed 129 tests and the dashboard/library suite passed 194 tests. Checks cover the deployed Apps Script health check, optional phone and size fields, inline and resumable uploads, queue transport fallback, approval gating, editable fields, stale revisions, file-path restrictions, flexible production ordering, privacy, upload validation, material-entry retries, and duplicate-send prevention. The existing local-data audit passed with two tickets, two files, and no orphaned files.
-
-Browser checks used a separate sample database and confirmed both configured accounts, simplified admin review fields, awaiting-review receipts, admin corrections/approval, staff starting a later job, material usage, pickup status, and public live-queue behavior. Telegram unit coverage verifies required one-time hashed receipt links, command parsing, requester pickup closure, staff new-ticket file links, decline-reason delivery to both audiences, and bounded retries. A live bot delivery test still requires the fresh token and private staff group. Sample data and credentials are excluded from the archive. Existing Create React App maintenance warnings remain; builds and tests pass.
-
-Still needed for launch: revoke any exposed bot token, add the fresh token to Apps Script Properties, run Telegram setup, register the private staff group, publish a new version of the existing Apps Script deployment, and rerun the GitHub Pages workflow. A private Node host is not required.
